@@ -1,0 +1,37 @@
+// !$*UTF8*$!
+{ archiveVersion = 1; classes = {}; objectVersion = 56; objects = {
+BD56ADC2840BD273853C3194 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HoldTranslate/App/BubbleView.swift"; sourceTree = SOURCE_ROOT; };
+8605D33BC84F15347D0BB324 = { isa = PBXBuildFile; fileRef = BD56ADC2840BD273853C3194; };
+37BC770336C82A94663073EC = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HoldTranslate/App/HoldTranslateApp.swift"; sourceTree = SOURCE_ROOT; };
+D539E02127761D2520A70C44 = { isa = PBXBuildFile; fileRef = 37BC770336C82A94663073EC; };
+C6E7C2C22472650CBE12D760 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HoldTranslate/App/InputMonitor.swift"; sourceTree = SOURCE_ROOT; };
+CEEA02CB975E808EC463BF71 = { isa = PBXBuildFile; fileRef = C6E7C2C22472650CBE12D760; };
+BDFBE47E51F9B7A7D2A9D855 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HoldTranslate/App/Preferences.swift"; sourceTree = SOURCE_ROOT; };
+856AD14D5480BCF3437F2C1F = { isa = PBXBuildFile; fileRef = BDFBE47E51F9B7A7D2A9D855; };
+293F4256ADFDA34E419FBCFB = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HoldTranslate/App/SelectionReader.swift"; sourceTree = SOURCE_ROOT; };
+821D1DAD99D232F86B9E64AC = { isa = PBXBuildFile; fileRef = 293F4256ADFDA34E419FBCFB; };
+9947FA0AD1E7DF0EC5A74285 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HoldTranslate/App/SettingsView.swift"; sourceTree = SOURCE_ROOT; };
+1EBB6C03A39FA688DB8E6A51 = { isa = PBXBuildFile; fileRef = 9947FA0AD1E7DF0EC5A74285; };
+437E7AABE4868147759C16FA = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HoldTranslate/App/TranslationModel.swift"; sourceTree = SOURCE_ROOT; };
+E31CB9376800F306373F9AD9 = { isa = PBXBuildFile; fileRef = 437E7AABE4868147759C16FA; };
+6A05D0C3D012F51829BB03B3 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HoldTranslate/Core/BubblePlacement.swift"; sourceTree = SOURCE_ROOT; };
+56FE2F4C1C0B0B9D1EF3A862 = { isa = PBXBuildFile; fileRef = 6A05D0C3D012F51829BB03B3; };
+A3955B89EB5CD1C5F63B7F32 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HoldTranslate/Core/GestureTracker.swift"; sourceTree = SOURCE_ROOT; };
+5F24B62567A34182FF2922C7 = { isa = PBXBuildFile; fileRef = A3955B89EB5CD1C5F63B7F32; };
+049B483A2DE2322062EE7E65 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HoldTranslate/Core/LanguagePolicy.swift"; sourceTree = SOURCE_ROOT; };
+A8B0A66891101A7F4A0F5C39 = { isa = PBXBuildFile; fileRef = 049B483A2DE2322062EE7E65; };
+38A007151ABE87CC01A5B6E9 = { isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HoldTranslate.app; sourceTree = BUILT_PRODUCTS_DIR; };
+FBDC4F23F93125BBEEAE800C = { isa = PBXGroup; children = (38A007151ABE87CC01A5B6E9,); name = Products; sourceTree = "<group>"; };
+E50290A24C49A459B43487C5 = { isa = PBXGroup; children = (BD56ADC2840BD273853C3194, 37BC770336C82A94663073EC, C6E7C2C22472650CBE12D760, BDFBE47E51F9B7A7D2A9D855, 293F4256ADFDA34E419FBCFB, 9947FA0AD1E7DF0EC5A74285, 437E7AABE4868147759C16FA, 6A05D0C3D012F51829BB03B3, A3955B89EB5CD1C5F63B7F32, 049B483A2DE2322062EE7E65, FBDC4F23F93125BBEEAE800C,); sourceTree = "<group>"; };
+BCE16DD0260827ECF338C787 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (8605D33BC84F15347D0BB324, D539E02127761D2520A70C44, CEEA02CB975E808EC463BF71, 856AD14D5480BCF3437F2C1F, 821D1DAD99D232F86B9E64AC, 1EBB6C03A39FA688DB8E6A51, E31CB9376800F306373F9AD9, 56FE2F4C1C0B0B9D1EF3A862, 5F24B62567A34182FF2922C7, A8B0A66891101A7F4A0F5C39,); runOnlyForDeploymentPostprocessing = 0; };
+7561BFB015D8F536760CB671 = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+0189424A5A60FED329FA868E = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+89E1FD6268CC0F221A2BE178 = { isa = XCBuildConfiguration; name = Debug; buildSettings = { MACOSX_DEPLOYMENT_TARGET = 15.0; SDKROOT = macosx; CLANG_ENABLE_MODULES = YES; SWIFT_VERSION = 5.0; SWIFT_STRICT_CONCURRENCY = complete; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; }; };
+7082CC0B6FC1282FCEABD07A = { isa = XCBuildConfiguration; name = Debug; buildSettings = { PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = com.yikessa.HoldTranslate; INFOPLIST_FILE = HoldTranslate/Resources/Info.plist; GENERATE_INFOPLIST_FILE = NO; CODE_SIGN_IDENTITY = "-"; CODE_SIGN_STYLE = Manual; ENABLE_APP_SANDBOX = NO; ENABLE_HARDENED_RUNTIME = YES; SWIFT_EMIT_LOC_STRINGS = NO; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks"; }; };
+E6DE6C99132752C914FEF632 = { isa = XCBuildConfiguration; name = Release; buildSettings = { MACOSX_DEPLOYMENT_TARGET = 15.0; SDKROOT = macosx; CLANG_ENABLE_MODULES = YES; SWIFT_VERSION = 5.0; SWIFT_STRICT_CONCURRENCY = complete; SWIFT_OPTIMIZATION_LEVEL = "-O"; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; }; };
+639A7CA24D39909E713B47F7 = { isa = XCBuildConfiguration; name = Release; buildSettings = { PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = com.yikessa.HoldTranslate; INFOPLIST_FILE = HoldTranslate/Resources/Info.plist; GENERATE_INFOPLIST_FILE = NO; CODE_SIGN_IDENTITY = "-"; CODE_SIGN_STYLE = Manual; ENABLE_APP_SANDBOX = NO; ENABLE_HARDENED_RUNTIME = YES; SWIFT_EMIT_LOC_STRINGS = NO; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks"; }; };
+49EA05A46B1A86EA7E413B43 = { isa = XCConfigurationList; buildConfigurations = (89E1FD6268CC0F221A2BE178, E6DE6C99132752C914FEF632,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+F497FD0CF9CA1625C4A860DE = { isa = XCConfigurationList; buildConfigurations = (7082CC0B6FC1282FCEABD07A, 639A7CA24D39909E713B47F7,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+0E8A3AD980EC179856012B7E = { isa = PBXNativeTarget; buildConfigurationList = F497FD0CF9CA1625C4A860DE; buildPhases = (BCE16DD0260827ECF338C787, 7561BFB015D8F536760CB671, 0189424A5A60FED329FA868E,); buildRules = (); dependencies = (); name = HoldTranslate; productName = HoldTranslate; productReference = 38A007151ABE87CC01A5B6E9; productType = "com.apple.product-type.application"; };
+98F54143AB4E86B28C3AFEE0 = { isa = PBXProject; attributes = { LastUpgradeCheck = 1600; }; buildConfigurationList = 49EA05A46B1A86EA7E413B43; compatibilityVersion = "Xcode 14.0"; developmentRegion = zh_CN; hasScannedForEncodings = 0; knownRegions = (en, zh_CN, Base); mainGroup = E50290A24C49A459B43487C5; productRefGroup = FBDC4F23F93125BBEEAE800C; projectDirPath = ""; projectRoot = ""; targets = (0E8A3AD980EC179856012B7E,); };
+}; rootObject = 98F54143AB4E86B28C3AFEE0; }
