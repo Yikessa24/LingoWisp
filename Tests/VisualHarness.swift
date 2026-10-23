@@ -21,7 +21,6 @@ import SwiftUI
         defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
         let preferences = Preferences(defaults: defaults)
-        preferences.dismissMode = .manual
         bubble = BubbleController(model: model, preferences: preferences)
         model.onFinished = { [weak self] in
             Task { @MainActor in

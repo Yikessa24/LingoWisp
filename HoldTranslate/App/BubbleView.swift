@@ -6,7 +6,6 @@ struct BubbleView: View {
     @ObservedObject var model: TranslationModel
     @ObservedObject var preferences: Preferences
     let close: () -> Void
-    let hover: (Bool) -> Void
     let sizeChanged: (CGSize) -> Void
     @State private var copied = false
 
@@ -25,7 +24,7 @@ struct BubbleView: View {
                     .help("复制译文").accessibilityLabel(copied ? "已复制" : "复制译文")
                 }
                 Button(action: close) { Image(systemName: "xmark").font(.system(size: 10, weight: .semibold)) }
-                    .help("关闭 · Esc").accessibilityLabel("关闭翻译")
+                    .help("关闭 · 气泡内双指右滑").accessibilityLabel("关闭翻译")
             }
             .foregroundStyle(.secondary).buttonStyle(.borderless)
 
@@ -70,7 +69,6 @@ struct BubbleView: View {
             Color.clear.onAppear { sizeChanged(geometry.size) }
                 .onChange(of: geometry.size) { _, size in sizeChanged(size) }
         })
-        .onHover(perform: hover)
         .onChange(of: model.request?.id) { _, _ in copied = false }
         .overlay(alignment: .topLeading) {
             if let request = model.request { TranslationWorker(request: request, model: model).id(request.id) }
@@ -93,115 +91,131 @@ struct BubbleView: View {
 }
 
 final class TranslationPanel: NSPanel {
+    var onScroll: ((NSEvent) -> Bool)?
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .scrollWheel, onScroll?(event) == true { return }
+        super.sendEvent(event)
+    }
 }
 
 @MainActor final class BubbleController {
     private let panel: TranslationPanel
     private let model: TranslationModel
-    private let preferences: Preferences
+    private let reduceMotion: () -> Bool
     private var anchor = CGRect.zero
     private var size = CGSize(width: 358, height: 160)
-    private var dismissal: Task<Void, Never>?
     private var closeGeneration = UUID()
-    private var closeDeadline: Date?
-    private var shownAt = Date.distantPast
-    private(set) var hovering = false
+    private var swipe = BubbleSwipeTracker()
+    private(set) var isDismissing = false
     var onHide: (() -> Void)?
     var isVisible: Bool { panel.isVisible }
     var frame: CGRect { panel.frame }
     var canBecomeKey: Bool { panel.canBecomeKey }
 
-    init(model: TranslationModel, preferences: Preferences) {
-        self.model = model; self.preferences = preferences
+    init(model: TranslationModel, preferences: Preferences,
+         reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }) {
+        self.model = model; self.reduceMotion = reduceMotion
         panel = TranslationPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isFloatingPanel = true
         panel.level = .popUpMenu
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         panel.hidesOnDeactivate = false
         panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = true
         panel.isReleasedWhenClosed = false
         panel.animationBehavior = .none
         panel.setAccessibilityLabel("HoldTranslate 翻译")
-        panel.contentView = NSHostingView(rootView: BubbleView(model: model, preferences: preferences, close: { [weak self] in self?.hide() }, hover: { [weak self] in self?.setHover($0) }, sizeChanged: { [weak self] size in self?.resize(size) }))
+        panel.contentView = NSHostingView(rootView: BubbleView(model: model, preferences: preferences,
+            close: { [weak self] in self?.hide(dissolving: true) },
+            sizeChanged: { [weak self] size in self?.resize(size) }))
         panel.contentView?.wantsLayer = true
+        panel.onScroll = { [weak self] in self?.handleScroll($0) ?? false }
     }
     func show(anchor: CGRect) {
-        dismissal?.cancel(); dismissal = nil; closeDeadline = nil; closeGeneration = UUID()
-        hovering = false; self.anchor = anchor; shownAt = Date()
+        closeGeneration = UUID(); isDismissing = false; swipe.reset()
+        panel.ignoresMouseEvents = false
+        panel.contentView?.layer?.mask = nil
+        panel.contentView?.layer?.removeAllAnimations()
+        self.anchor = anchor
         position()
         panel.alphaValue = 0
         panel.orderFrontRegardless()
-        if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+        if !reduceMotion() {
             let scale = CABasicAnimation(keyPath: "transform.scale")
             scale.fromValue = 0.985; scale.toValue = 1.0; scale.duration = 0.13
             scale.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.contentView?.layer?.add(scale, forKey: "appear")
         }
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.13
+            context.duration = reduceMotion() ? 0 : 0.13
             panel.animator().alphaValue = 1
         }
     }
-    func finished() {
-        shownAt = Date()
-        guard preferences.dismissMode == .automatic else { return }
-        let seconds: Double
-        if case .result(let text) = model.state { seconds = min(45, max(12, Double(text.count) / 12)) }
-        else { seconds = 12 }
-        scheduleClose(after: seconds)
-    }
-    func released() {
-        guard preferences.dismissMode == .release else { return }
-        // Allow the pointer to enter the bubble, even if a key is released immediately.
-        scheduleClose(after: 1.2)
-    }
-    func moved(to point: CGPoint) {
-        guard isVisible, !hovering, preferences.dismissMode == .automatic,
-              model.state != .loading, Date().timeIntervalSince(shownAt) > 3 else { return }
-        if !panel.frame.insetBy(dx: -140, dy: -100).contains(point) { scheduleClose(after: 0.8) }
-    }
-    private func setHover(_ value: Bool) {
-        hovering = value
-        if value { dismissal?.cancel(); dismissal = nil; closeDeadline = nil }
-        else if preferences.dismissMode != .manual { scheduleClose(after: preferences.dismissMode == .release ? 1.2 : 4) }
-    }
-    private func scheduleClose(after seconds: Double) {
-        guard isVisible, !hovering else { return }
-        let deadline = Date().addingTimeInterval(seconds)
-        // Keep the earlier deadline. Mouse movement must not postpone dismissal,
-        // and moving away should be able to shorten the ordinary reading timer.
-        if let closeDeadline, closeDeadline <= deadline { return }
-        dismissal?.cancel()
-        closeDeadline = deadline
-        dismissal = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(seconds))
-            guard !Task.isCancelled, let self else { return }
-            self.dismissal = nil; self.closeDeadline = nil
-            if !self.hovering { self.hide() }
+    private func handleScroll(_ event: NSEvent) -> Bool {
+        guard isVisible, !isDismissing else { return false }
+        let point = event.window === panel ? event.locationInWindow : panel.convertPoint(fromScreen: NSEvent.mouseLocation)
+        let inside = panel.contentView?.bounds.contains(point) == true
+        if swipe.process(deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY,
+                         phase: event.phase, momentum: event.momentumPhase,
+                         precise: event.hasPreciseScrollingDeltas,
+                         inverted: event.isDirectionInvertedFromDevice, inside: inside) {
+            hide(dissolving: true)
+            return true
         }
+        return false // Vertical gestures continue to the translation's ScrollView.
     }
-    func hide() {
-        dismissal?.cancel(); dismissal = nil; closeDeadline = nil
-        guard panel.isVisible else { model.reset(); return }
-        let token = UUID(); closeGeneration = token
+    func hide(dissolving: Bool = false) {
+        let token = UUID()
+        if dissolving && isDismissing { return }
+        closeGeneration = token; swipe.reset()
+        guard panel.isVisible else { model.reset(); isDismissing = false; return }
         onHide?()
-        model.reset()
+        guard dissolving else {
+            panel.orderOut(nil); panel.contentView?.layer?.mask = nil
+            panel.contentView?.layer?.removeAllAnimations()
+            isDismissing = false; model.reset()
+            return
+        }
+        isDismissing = true
+        panel.ignoresMouseEvents = true
+        model.cancelWork() // Keep the displayed text until the animation completes.
+        let duration = reduceMotion() ? 0.12 : 0.28
+        if !reduceMotion(), let layer = panel.contentView?.layer {
+            let mask = CAGradientLayer()
+            mask.frame = layer.bounds
+            mask.startPoint = CGPoint(x: 0, y: 0.5); mask.endPoint = CGPoint(x: 1, y: 0.5)
+            mask.locations = [0, 0.7, 1]
+            let opaque = [CGColor(gray: 1, alpha: 1), CGColor(gray: 1, alpha: 1), CGColor(gray: 1, alpha: 1)]
+            let dissolved = [CGColor(gray: 1, alpha: 0), CGColor(gray: 1, alpha: 0), CGColor(gray: 1, alpha: 1)]
+            mask.colors = dissolved
+            let fade = CABasicAnimation(keyPath: "colors")
+            fade.fromValue = opaque; fade.toValue = dissolved; fade.duration = duration
+            fade.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            layer.mask = mask; mask.add(fade, forKey: "dissolve")
+        }
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.1
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            if !reduceMotion() { panel.animator().setFrameOrigin(CGPoint(x: panel.frame.minX + 64, y: panel.frame.minY)) }
             panel.animator().alphaValue = 0
         } completionHandler: { [weak self] in
             Task { @MainActor in
                 guard let self, self.closeGeneration == token else { return }
                 self.panel.orderOut(nil)
+                self.panel.contentView?.layer?.mask = nil
+                self.isDismissing = false
+                self.model.reset()
             }
         }
+    }
+    func reposition() {
+        if panel.isVisible, !isDismissing { position() }
     }
     private func resize(_ size: CGSize) {
         guard abs(self.size.height - size.height) > 1 else { return }
         self.size = size
-        if panel.isVisible { position() }
+        if panel.isVisible, !isDismissing { position() }
     }
     private func position() {
         let screen = NSScreen.screens.first { $0.frame.contains(CGPoint(x: anchor.midX, y: anchor.midY)) } ?? NSScreen.main

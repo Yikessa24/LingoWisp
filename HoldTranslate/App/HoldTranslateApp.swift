@@ -37,17 +37,11 @@ import ApplicationServices
             monitor.onGestureStatus = { [weak self] in self?.writeInputStatus($0) }
         }
         monitor.onSelection = { [weak self] in self?.translate(at: $0) }
-        monitor.onOutsideClick = { [weak self] in self?.dismiss() }
-        monitor.onTyping = { [weak self] in self?.dismiss() }
-        monitor.onRelease = { [weak self] in self?.bubble.released() }
-        monitor.onMove = { [weak self] in self?.bubble.moved(to: $0) }
         bubble.onHide = { [weak self] in
             self?.selectionTask?.cancel()
             self?.generation = UUID()
-            self?.monitor.watchMovement(false)
         }
         translation.onFinished = { [weak self] in
-            self?.bubble.finished()
             self?.recordDiagnosticResult()
             if case .result = self?.translation.state { self?.writeInputStatus("translationSucceeded") }
         }
@@ -69,10 +63,10 @@ import ApplicationServices
         preferences.$enabled.dropFirst().sink { [weak self] _ in
             Task { @MainActor in self?.dismiss(); self?.configureMonitoring(); self?.updateMenu() }
         }.store(in: &subscriptions)
-        preferences.$trigger.dropFirst().sink { [weak self] _ in Task { @MainActor in self?.dismiss(); self?.configureMonitoring() } }.store(in: &subscriptions)
+        preferences.$trigger.dropFirst().sink { [weak self] _ in Task { @MainActor in self?.configureMonitoring() } }.store(in: &subscriptions)
         updateMenu(); configureMonitoring()
         let workspace = NSWorkspace.shared.notificationCenter
-        for name in [NSWorkspace.willSleepNotification, NSWorkspace.sessionDidResignActiveNotification, NSWorkspace.activeSpaceDidChangeNotification] {
+        for name in [NSWorkspace.willSleepNotification, NSWorkspace.sessionDidResignActiveNotification] {
             observers.append(workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 Task { @MainActor in self?.dismiss() }
             })
@@ -82,14 +76,11 @@ import ApplicationServices
                 Task { @MainActor in self?.settingsModel.refresh(); self?.configureMonitoring() }
             })
         }
-        observers.append(workspace.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.dismiss() }
-        })
         NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification).sink { [weak self] _ in
             Task { @MainActor in self?.settingsModel.refresh(); self?.configureMonitoring() }
         }.store(in: &subscriptions)
         NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification).sink { [weak self] _ in
-            Task { @MainActor in self?.dismiss() }
+            Task { @MainActor in self?.bubble.reposition() }
         }.store(in: &subscriptions)
         if !UserDefaults.standard.bool(forKey: "hasLaunched") || CommandLine.arguments.contains("--settings") {
             UserDefaults.standard.set(true, forKey: "hasLaunched")
@@ -185,7 +176,6 @@ import ApplicationServices
     }
     @objc private func toggleEnabled() { preferences.enabled.toggle() }
     @objc func showSettings() {
-        dismiss()
         settingsModel.refresh()
         if settingsWindow == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 510, height: 650), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
@@ -200,7 +190,7 @@ import ApplicationServices
     }
     private func translate(at point: CGPoint, usingClipboard: Bool = false, expectedPID: pid_t? = nil) {
         guard preferences.enabled, let front = NSWorkspace.shared.frontmostApplication, front.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
-        if let expectedPID, expectedPID != front.processIdentifier { dismiss(); return }
+        if let expectedPID, expectedPID != front.processIdentifier { return }
         dismiss()
         let token = UUID(); generation = token
         let pid = front.processIdentifier
@@ -235,8 +225,6 @@ import ApplicationServices
                 }
                 translation.begin(text: text, target: preferences.target)
                 bubble.show(anchor: anchor)
-                monitor.watchMovement(true)
-                if !preferences.trigger.matches(NSEvent.modifierFlags) { bubble.released() }
             } catch {
                 guard valid(token: token, pid: pid) else { return }
                 if case SelectionError.secure = error { writeInputStatus("secureInputSkipped"); return }
@@ -245,8 +233,6 @@ import ApplicationServices
                     translation.unavailable { [weak self] in self?.translate(at: point, usingClipboard: true, expectedPID: pid) }
                 } else { translation.message(error.localizedDescription) }
                 bubble.show(anchor: CGRect(origin: point, size: CGSize(width: 1, height: 1)))
-                bubble.finished()
-                monitor.watchMovement(true)
             }
         }
     }
@@ -255,7 +241,7 @@ import ApplicationServices
     }
     private func dismiss() {
         generation = UUID(); selectionTask?.cancel(); selectionTask = nil
-        bubble?.hide(); monitor?.watchMovement(false)
+        bubble?.hide()
     }
     func applicationWillTerminate(_ notification: Notification) {
         dismiss(); monitor?.stop(); globalShortcut.shutdown()

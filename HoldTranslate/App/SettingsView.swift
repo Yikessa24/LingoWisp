@@ -74,7 +74,8 @@ struct SettingsView: View {
                     Picker("翻译为", selection: $preferences.target) { ForEach(TargetChoice.allCases) { Text($0.title).tag($0) } }
                 } header: { Text("翻译") }
                 Section {
-                    Picker("收起气泡", selection: $preferences.dismissMode) { ForEach(DismissMode.allCases) { Text($0.title).tag($0) } }
+                    Text("译文气泡保持显示。点击 ×，或将指针移入气泡后双指向右滑动关闭。")
+                        .font(.caption).foregroundStyle(.secondary)
                     Toggle("显示原文摘要", isOn: $preferences.showOriginal)
                     Toggle("登录时启动", isOn: Binding(get: { model.loginEnabled }, set: { model.setLogin($0) }))
                     if let message = model.loginMessage { Text(message).font(.caption).foregroundStyle(.secondary) }

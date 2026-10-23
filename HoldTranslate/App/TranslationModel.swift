@@ -87,10 +87,14 @@ enum BubbleState: Equatable {
         self.state = state
         onChange?(); onFinished?()
     }
-    func reset() {
+    func cancelWork() {
         generation = UUID()
         availabilityTask?.cancel(); availabilityTask = nil
         timeoutTask?.cancel(); timeoutTask = nil
+        request = nil; copySelection = nil
+    }
+    func reset() {
+        cancelWork()
         request = nil; original = ""; pair = nil; state = .loading; copySelection = nil
     }
 }

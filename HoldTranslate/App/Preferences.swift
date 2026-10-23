@@ -15,14 +15,6 @@ import SwiftUI
     }
 }
 
-enum DismissMode: String, CaseIterable, Identifiable {
-    case automatic, release, manual
-    var id: String { rawValue }
-    var title: String {
-        switch self { case .automatic: "读完后自动收起"; case .release: "松开修饰键后收起"; case .manual: "点击外部或按 Esc 收起" }
-    }
-}
-
 @MainActor final class Preferences: ObservableObject {
     @Published var shortcut: KeyboardShortcut {
         didSet { if let data = try? JSONEncoder().encode(shortcut) { defaults.set(data, forKey: "selectionShortcut") } }
@@ -30,7 +22,6 @@ enum DismissMode: String, CaseIterable, Identifiable {
     @Published var enabled: Bool { didSet { save(enabled, "enabled") } }
     @Published var trigger: TriggerKey { didSet { save(trigger.rawValue, "trigger") } }
     @Published var target: TargetChoice { didSet { save(target.rawValue, "target") } }
-    @Published var dismissMode: DismissMode { didSet { save(dismissMode.rawValue, "dismissMode") } }
     @Published var allowClipboardFallback: Bool { didSet { save(allowClipboardFallback, "allowClipboardFallback") } }
     @Published var showOriginal: Bool { didSet { save(showOriginal, "showOriginal") } }
     private let defaults: UserDefaults
@@ -42,7 +33,6 @@ enum DismissMode: String, CaseIterable, Identifiable {
         enabled = defaults.object(forKey: "enabled") as? Bool ?? true
         trigger = TriggerKey(rawValue: defaults.string(forKey: "trigger") ?? "") ?? .option
         target = TargetChoice(rawValue: defaults.string(forKey: "target") ?? "") ?? .automatic
-        dismissMode = DismissMode(rawValue: defaults.string(forKey: "dismissMode") ?? "") ?? .automatic
         allowClipboardFallback = defaults.bool(forKey: "allowClipboardFallback")
         showOriginal = defaults.object(forKey: "showOriginal") as? Bool ?? true
     }
