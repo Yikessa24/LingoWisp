@@ -13,7 +13,7 @@ struct BubbleView: View {
         VStack(alignment: .leading, spacing: 13) {
             HStack(spacing: 6) {
                 Image(systemName: "character.bubble").font(.system(size: 12, weight: .medium))
-                Text(model.pair?.label ?? "HoldTranslate").font(.system(size: 11, weight: .medium))
+                Text(model.pair?.label ?? "译泡").font(.system(size: 11, weight: .medium))
                 Spacer(minLength: 4)
                 if case let .result(result) = model.state {
                     Button {
@@ -170,7 +170,7 @@ final class TranslationPanel: NSPanel {
         panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = true
         panel.isReleasedWhenClosed = false
         panel.animationBehavior = .none
-        panel.setAccessibilityLabel("HoldTranslate 翻译")
+        panel.setAccessibilityLabel("译泡 · LingoWisp 翻译")
         panel.contentView = BubbleHostingView(rootView: BubbleView(model: model, preferences: preferences,
             close: { [weak self] in self?.hide(dissolving: true) },
             sizeChanged: { [weak self] size in self?.resize(size) }))

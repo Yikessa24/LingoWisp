@@ -3,7 +3,7 @@ import AppKit
 import Combine
 import ApplicationServices
 
-@main struct HoldTranslateApp: App {
+@main struct LingoWispApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     var body: some Scene { Settings { EmptyView() } }
 }
@@ -59,7 +59,7 @@ import ApplicationServices
             else { self?.configureShortcut() }
         }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "character.bubble", accessibilityDescription: "HoldTranslate")
+        statusItem.button?.image = NSImage(systemSymbolName: "character.bubble", accessibilityDescription: "译泡 · LingoWisp")
         preferences.$enabled.dropFirst().sink { [weak self] _ in
             Task { @MainActor in self?.dismiss(); self?.configureMonitoring(); self?.updateMenu() }
         }.store(in: &subscriptions)
@@ -168,18 +168,18 @@ import ApplicationServices
         let settings = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self; menu.addItem(settings)
         menu.addItem(.separator())
-        let quit = NSMenuItem(title: "退出 HoldTranslate", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quit = NSMenuItem(title: "退出译泡", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quit)
         statusItem.menu = menu
         statusItem.button?.appearsDisabled = !preferences.enabled
-        statusItem.button?.toolTip = preferences.enabled ? "HoldTranslate · 按住修饰键划选" : "HoldTranslate · 已暂停"
+        statusItem.button?.toolTip = preferences.enabled ? "译泡 · 选中文字，译文就在旁边。" : "译泡 · 已暂停"
     }
     @objc private func toggleEnabled() { preferences.enabled.toggle() }
     @objc func showSettings() {
         settingsModel.refresh()
         if settingsWindow == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 510, height: 650), styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
-            window.title = "HoldTranslate 设置"
+            window.title = "译泡 · LingoWisp 设置"
             window.contentView = NSHostingView(rootView: SettingsView(preferences: preferences, model: settingsModel))
             window.isReleasedWhenClosed = false
             window.center()

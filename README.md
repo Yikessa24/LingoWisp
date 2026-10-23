@@ -1,8 +1,12 @@
-# HoldTranslate
+# 译泡 · LingoWisp
 
-轻量 macOS 菜单栏划词翻译工具。按住修饰键划选文字，松开鼠标，在原位置附近阅读译文。
+**选中文字，译文就在旁边。**
+
+轻量 macOS 菜单栏翻译工具。按住修饰键划选，或选中文字后按 ⌥D，在原位置附近阅读译文。
 
 使用 SwiftUI、AppKit、Accessibility、NaturalLanguage 和 Apple Translation。无第三方依赖，无账号或 API Key，无翻译历史。
+
+原名 HoldTranslate。更名后沿用原应用标识，保留现有快捷键和偏好设置。旧版本的发布记录保留在历史 Release 中。
 
 ## 系统要求
 
@@ -15,10 +19,10 @@
 
 ```sh
 ./scripts/build.sh
-open build/Distribution/HoldTranslate.app
+open build/Distribution/LingoWisp.app
 ```
 
-也可以打开 `HoldTranslate.xcodeproj`，选择 HoldTranslate scheme 后运行。`Package.swift` 用于核心逻辑、请求生命周期和窗口行为单元测试：
+也可以打开 `LingoWisp.xcodeproj`，选择 LingoWisp scheme 后运行。`Package.swift` 用于核心逻辑、请求生命周期和窗口行为单元测试：
 
 ```sh
 swift test
@@ -26,19 +30,19 @@ swift test
 
 提交的 Xcode 工程无需第三方生成器。添加 Swift 文件后可运行 `python3 scripts/generate-project.py` 重新生成工程。
 
-发布构建位于 `build/Distribution/HoldTranslate.app`，不提交构建缓存。建议复制到固定位置（例如 `~/Applications`）再授权和启用登录启动。移动或重新签名后，系统可能要求重新授权。若开关已开启但应用仍提示未授权，请在辅助功能列表移除旧 HoldTranslate，再通过加号添加当前路径的应用；单纯关闭后再开启可能无法刷新旧 ad-hoc 签名记录。
+发布构建位于 `build/Distribution/LingoWisp.app`，不提交构建缓存。建议复制到固定位置（例如 `~/Applications`）再授权和启用登录启动。移动或重新签名后，系统可能要求重新授权。若开关已开启但应用仍提示未授权，请在辅助功能列表移除旧应用条目，再通过加号添加当前路径的应用；单纯关闭后再开启可能无法刷新旧 ad-hoc 签名记录。
 
 本地构建使用 ad-hoc 签名；**没有 Developer ID 签名或公证**，不能宣称通过 Gatekeeper 分发验证。若自行分发，请使用自己的开发者证书签名并公证。不要关闭系统安全保护。
 
 ## 使用
 
-1. 启动后在设置中阅读权限说明，点击「前往授权」。在系统设置 → 隐私与安全性 → 辅助功能中开启 HoldTranslate。
+1. 启动后在设置中阅读权限说明，点击「前往授权」。在系统设置 → 隐私与安全性 → 辅助功能中开启译泡（LingoWisp）。
 2. 回到设置，点击「准备语言包」，完成系统下载确认。
 3. 在其他应用按住 **⌥ Option**，拖动选中文字，然后松开鼠标。
 4. 也可以先选中文字，再按 **⌥D**（Option + D）。在菜单栏 → 设置 →「选中后翻译」点击快捷键按钮，直接按下新组合即可保存；Esc 取消，「恢复默认」改回 ⌥D。设置会在重启后保留，已占用的组合会提示冲突。
 5. 气泡弹出时不抢键盘焦点。可直接划选译文，按 **⌘C** 或右键「复制」；点击译文后按 **⌘A** 全选。顶部小复制按钮仍可复制完整译文。
 
-Option 会影响某些应用的选区行为（例如矩形选择）。可切换到 Control 或 Option + Command；Control 也可能触发原应用上下文菜单。划选事件只读监听。「选中后翻译」使用系统全局快捷键注册，按下组合时由 HoldTranslate 处理，避免 Option+D 在编辑器中输入特殊字符。选择组合时请避开自己常用的编辑命令。
+Option 会影响某些应用的选区行为（例如矩形选择）。可切换到 Control 或 Option + Command；Control 也可能触发原应用上下文菜单。划选事件只读监听。「选中后翻译」使用系统全局快捷键注册，按下组合时由译泡处理，避免 Option+D 在编辑器中输入特殊字符。选择组合时请避开自己常用的编辑命令。
 
 默认中文翻译为英文，其他可识别语言翻译为简体中文；可手动指定目标语言。长选区（超过 5,000 字）、空白、数字、明显 URL/代码和无法可靠识别的内容会得到简洁提示。
 

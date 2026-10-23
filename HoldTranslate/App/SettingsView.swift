@@ -29,7 +29,7 @@ import ServiceManagement
         do {
             if enabled { try SMAppService.mainApp.register() }
             else { try SMAppService.mainApp.unregister() }
-            loginMessage = SMAppService.mainApp.status == .requiresApproval ? "请在系统设置 → 通用 → 登录项中允许 HoldTranslate。" : nil
+            loginMessage = SMAppService.mainApp.status == .requiresApproval ? "请在系统设置 → 通用 → 登录项中允许译泡（LingoWisp）。" : nil
         } catch { loginMessage = "无法更改登录项。请将应用放在固定位置后重试，或在系统设置中管理。" }
         refresh()
     }
@@ -47,8 +47,8 @@ struct SettingsView: View {
             HStack(spacing: 13) {
                 Image(systemName: "character.bubble.fill").font(.system(size: 32)).foregroundStyle(.tint)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("HoldTranslate").font(.system(size: 23, weight: .semibold))
-                    Text("按住，划选，即刻理解。").font(.system(size: 12)).foregroundStyle(.secondary)
+                    Text("译泡 · LingoWisp").font(.system(size: 23, weight: .semibold))
+                    Text("选中文字，译文就在旁边。").font(.system(size: 12)).foregroundStyle(.secondary)
                 }
                 Spacer()
             }.padding(24)

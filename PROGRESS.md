@@ -134,3 +134,10 @@
 - Release arm64/x86_64 构建及固定安装路径签名校验通过，1.4.0 已安装。辅助功能旧签名记录刷新遇到系统 Touch ID/密码验证，等待用户本人完成后继续恢复授权。
 - 产物：`build/Distribution/HoldTranslate-1.4.0-macOS.zip`，SHA-256：`cae65271c948d84eae630ed939b29ec9174885caaae84d3d5790aa279a12a37c`。
 - 用户完成系统身份验证后，已将固定安装路径的 1.4.0 重新加入辅助功能列表；系统开关开启，应用内部明确显示「辅助功能已授权」。设置截图已更新，随后普通启动菜单栏应用。
+
+## 2026-10-23 · 1.4.1：译泡 · LingoWisp
+- 用户确认中文名「译泡」与英文名 LingoWisp。更新应用显示名、设置与退出菜单、菜单栏提示、气泡标识、版权、README，以及 Xcode 工程/scheme/输出文件名。
+- 保留 `com.yikessa.HoldTranslate`、原偏好键及单实例锁，以继承已有设置并防止旧新两版同时监听。历史源目录、测试模块和已发布的旧版记录保留原命名。
+- Release arm64/x86_64 构建成功，核对显示名、执行文件、版本 1.4.1/build 9 和原 bundle ID；签名及 ZIP 完整性校验通过。仅验证更名与安装，未重复运行已通过的功能测试。
+- 已安装到 `~/Applications/LingoWisp.app`，旧 1.4.0 保留在忽略的 `build/PreviousInstall/` 中作为回退备份。实际界面确认新名称、介绍语与 ⌥D；系统辅助功能路径已刷新，应用内确认已授权。
+- 产物：`build/Distribution/LingoWisp-1.4.1-macOS.zip`，SHA-256：`4147d6310a18b5b3b532c73db29ab01eac44c1d9cf855b3169b2f468adc9d5d0`。
