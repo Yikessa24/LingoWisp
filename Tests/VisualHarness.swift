@@ -30,6 +30,23 @@ import SwiftUI
         }
         let point = NSScreen.main?.visibleFrame.center ?? .zero
         bubble.show(anchor: CGRect(origin: point, size: CGSize(width: 1, height: 1)))
+        if CommandLine.arguments.contains("--selection-only") {
+            model.original = "This is a beautiful day to learn something new."
+            model.state = .result("这是一个学习新事物的好日子。你可以选择这段译文的一部分，然后复制。")
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(250))
+                let board = NSPasteboard(name: .init("HoldTranslateSelectionVerification"))
+                board.clearContents(); board.setString("selection-test-not-copied", forType: .string)
+                @MainActor func redirectCopy(in view: NSView) {
+                    if let text = view as? TranslationTextView { text.copyPasteboard = board }
+                    for child in view.subviews { redirectCopy(in: child) }
+                }
+                for window in NSApp.windows where window is TranslationPanel {
+                    if let view = window.contentView { redirectCopy(in: view) }
+                }
+            }
+            return // Interactive selection fixture; no TranslationSession runs.
+        }
         started = Date()
         var text = "This is a beautiful day to learn something new."
         if CommandLine.arguments.contains("--chinese") { text = "今天的天气很好，我们一起出去散步吧。" }

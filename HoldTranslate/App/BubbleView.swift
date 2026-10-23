@@ -85,9 +85,8 @@ struct BubbleView: View {
         ).height) + 2
     }
     private func resultText(_ text: String) -> some View {
-        Text(text).font(.system(size: 15)).lineSpacing(5)
+        SelectableTranslationText(text: text)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityLabel("译文：\(text)")
     }
 }
 
@@ -104,13 +103,35 @@ final class TranslationPanel: NSPanel {
     var onScroll: ((NSEvent) -> Bool)?
     var canStartDrag: ((NSEvent) -> Bool)?
     var onDrag: (() -> Void)?
-    override var canBecomeKey: Bool { false }
+    private var textInteraction = false
+    override var canBecomeKey: Bool { textInteraction }
     override var canBecomeMain: Bool { false }
+    @discardableResult func prepareTextInteraction(at point: CGPoint) -> TranslationTextView? {
+        guard let contentView else { return nil }
+        func translation(in view: NSView) -> TranslationTextView? {
+            guard !view.isHidden, view.bounds.contains(view.convert(point, from: nil)) else { return nil }
+            if let text = view as? TranslationTextView { return text }
+            return view.subviews.reversed().compactMap { translation(in: $0) }.first
+        }
+        let text = translation(in: contentView)
+        if text != nil { textInteraction = true }
+        return text
+    }
+    func resetTextInteraction() {
+        if isKeyWindow { resignKey() }
+        textInteraction = false
+    }
     override func sendEvent(_ event: NSEvent) {
         if event.type == .leftMouseDown, canStartDrag?(event) == true {
             onDrag?()
             performDrag(with: event)
             return
+        }
+        if event.type == .leftMouseDown || event.type == .rightMouseDown {
+            if let text = prepareTextInteraction(at: event.locationInWindow) {
+                makeKey()
+                makeFirstResponder(text)
+            }
         }
         if event.type == .scrollWheel, onScroll?(event) == true { return }
         super.sendEvent(event)
@@ -142,6 +163,7 @@ final class TranslationPanel: NSPanel {
         panel.delegate = self
         panel.isMovable = true
         panel.isFloatingPanel = true
+        panel.becomesKeyOnlyIfNeeded = true
         panel.level = .popUpMenu
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         panel.hidesOnDeactivate = false
@@ -167,6 +189,7 @@ final class TranslationPanel: NSPanel {
     func show(anchor: CGRect) {
         closeGeneration = UUID(); isDismissing = false; swipe.reset()
         burst?.cancel(); burst = nil; manualTopLeft = nil
+        panel.resetTextInteraction()
         panel.ignoresMouseEvents = false
         panel.contentView?.layer?.mask = nil
         panel.contentView?.layer?.removeAllAnimations()
@@ -204,6 +227,7 @@ final class TranslationPanel: NSPanel {
         burst?.cancel(); burst = nil
         guard panel.isVisible else { model.reset(); isDismissing = false; return }
         onHide?()
+        panel.resetTextInteraction()
         guard dissolving else {
             panel.orderOut(nil); panel.contentView?.layer?.removeAllAnimations()
             isDismissing = false; model.reset()
