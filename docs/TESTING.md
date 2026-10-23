@@ -88,3 +88,5 @@ open build/Distribution/HoldTranslate.app --args --smoke-test --diagnostic-repor
 - 已安装二进制的合成英文烟雾测试返回 translated，frontmostUnchanged=true、panelCanBecomeKey=false。
 - ZIP：`build/Distribution/HoldTranslate-macOS.zip`，约 1.1 MB。SHA-256：`3ae82bcb6b4a278d8246a2ac3a84e937bbe21754c1ced083b90c2b0047007018`。
 - 安装路径变化后辅助功能需要刷新。系统要求用户完成 Touch ID / 密码确认；该检查不计作已安装路径的全局划词通过。
+- 用户完成系统身份验证后，固定路径版本的辅助功能条目已重新添加，应用内部明确显示「辅助功能已授权」；保存了该安装版本的真实设置截图。
+- 已退出带烟雾测试参数的实例，并普通启动固定路径应用。源路径 TextEdit 用户实测通过；未把安装后的授权状态检查重复计为全局输入实测。

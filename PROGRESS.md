@@ -55,3 +55,6 @@
 - 安装后的固定合成英文烟雾测试真实返回 translated；前台应用保持不变，panelCanBecomeKey=false。移动后的辅助功能信任需刷新。
 - 分发 ZIP：`build/Distribution/HoldTranslate-macOS.zip`，约 1.1 MB；SHA-256 为 `3ae82bcb6b4a278d8246a2ac3a84e937bbe21754c1ced083b90c2b0047007018`。
 - 更新固定路径授权时，系统要求 Touch ID / 登录密码；已请用户亲自完成，不自动输入或绕过身份验证。
+- 用户完成 Touch ID / 密码验证后，已把授权条目替换为 `/Users/felixyan/Applications/HoldTranslate.app`；应用内部再次确认「辅助功能已授权」。
+- 最终安装版本的设置截图已更新；退出诊断实例后以普通启动方式重新运行，保持菜单栏驻留。
+- GitHub 已核实为私人仓库；稳定性与视觉改进提交 e1b40de 已成功推送 main。
