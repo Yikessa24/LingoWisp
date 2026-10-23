@@ -1,122 +1,120 @@
 import CoreGraphics
 import Foundation
 
-/// One renderer drives the live animation and its deterministic frame previews.
-/// The only image is the app's own bubble, never a screen capture.
-enum BubbleBurstRenderer {
-    static let duration: TimeInterval = 0.62
-    static let margin: CGFloat = 110
+/// Port of the approved circular dust preview. Preparation happens once per
+/// dismissal; the image and sampling buffer contain only this app's bubble.
+final class BubbleBurstRenderer {
+    static let duration: TimeInterval = 1.4
+    static let margin: CGFloat = 240
+    private let image: CGImage
+    private let card: CGRect
+    private let material: CGContext
+    private let scale: CGFloat = 2
+    private var grains: [Grain] = []
+    private var particles: [Particle] = []
 
-    static func draw(in context: CGContext, image: CGImage, card: CGRect, time: TimeInterval) {
-        guard time >= 0, time < duration else { return }
-        let center = CGPoint(x: card.midX, y: card.midY)
-        let swell = 1 + 0.035 * sin(min(1, time / 0.13) * .pi)
-        let rupture = progress(time, from: 0.065, to: 0.235)
-        let radius = hypot(card.width, card.height) * 0.56 * easeOut(rupture)
-        context.saveGState()
-        context.translateBy(x: center.x, y: center.y)
-        context.scaleBy(x: swell, y: swell)
-        context.translateBy(x: -center.x, y: -center.y)
-        let outline = CGPath(roundedRect: card, cornerWidth: 16, cornerHeight: 16, transform: nil)
-        context.addPath(outline)
-        context.clip()
-        let tear = rupturePath(center: center, radius: radius)
-        if rupture > 0 {
-            context.addRect(card)
-            context.addPath(tear)
-            context.clip(using: .evenOdd)
+    private struct Grain {
+        let x, y, birth, radius: CGFloat
+    }
+    private struct Particle {
+        let x, y, birth, life, vx, vy, swirl, phase, size, alpha: CGFloat
+        let color: CGColor
+    }
+
+    init?(image: CGImage, card: CGRect) {
+        guard card.width > 0, card.height > 0 else { return nil }
+        self.image = image; self.card = card
+        let width = Int(ceil(card.width * 2)), height = Int(ceil(card.height * 2))
+        guard let source = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                     space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let material = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                       space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        self.material = material
+        source.scaleBy(x: scale, y: scale)
+        source.draw(image, in: CGRect(origin: .zero, size: card.size))
+        material.scaleBy(x: scale, y: scale)
+        guard let raw = source.data else { return nil }
+        let pixels = raw.assumingMemoryBound(to: UInt8.self)
+        var row = 0
+        var gy: CGFloat = -2
+        while gy <= card.height + 3 {
+            var gx: CGFloat = -3
+            while gx <= card.width + 3 {
+                let x = gx + CGFloat(row % 2) * 1.5 + (Self.noise(gx + 4, gy + 7) - 0.5) * 0.35
+                let y = gy + (Self.noise(gy + 5, gx + 9) - 0.5) * 0.35
+                let n = Self.noise(x, y), n2 = Self.noise(y + 9, x + 17), n3 = Self.noise(x + 84, y + 51)
+                let rough = sin(y * 0.087 + x * 0.035) * 0.07 + sin(y * 0.23 - x * 0.10) * 0.035 + (n - 0.5) * 0.14
+                let birth = Self.clamp(0.055 + (1 - x / card.width) * 1.42 + rough, 0.07, 1.52)
+                grains.append(Grain(x: x, y: y, birth: birth, radius: 2.4 + n2 * 0.15))
+                if x >= 0, y >= 0, x < card.width, y < card.height {
+                    let sx = min(width - 1, Int(x * scale)), sy = min(height - 1, Int(y * scale))
+                    let i = (sy * width + sx) * 4
+                    let alpha = CGFloat(pixels[i + 3]) / 255
+                    if alpha >= 24.0 / 255 {
+                        // Unpremultiply before applying the preview's subtle ash tint.
+                        func channel(_ offset: Int) -> CGFloat {
+                            Self.clamp((CGFloat(pixels[i + offset]) / max(alpha, 0.001) * 0.76 + 22) / 255, 0, 1)
+                        }
+                        particles.append(Particle(x: x, y: y, birth: birth, life: 0.47 + n * 0.38,
+                            vx: 65 + n2 * 170, vy: (n3 - 0.62) * 55, swirl: 4 + n2 * 14,
+                            phase: n * .pi * 2, size: 1.1 + n3 * 2.1, alpha: alpha,
+                            color: CGColor(red: channel(0), green: channel(1), blue: channel(2), alpha: 1)))
+                    }
+                }
+                gx += 3
+            }
+            gy += 2.6; row += 1
         }
-        context.draw(image, in: card)
-        // A bright, thin retracting membrane makes the rupture visible before
-        // the card has vanished; it is clipped to the remaining film.
-        if rupture > 0 {
-            context.setStrokeColor(CGColor(red: 0.70, green: 0.87, blue: 1, alpha: 0.95))
-            context.setLineWidth(2)
-            context.addPath(tear); context.strokePath()
+    }
+
+    func draw(in context: CGContext, time: TimeInterval) {
+        guard time >= 0, time < Self.duration else { return }
+        // Preserve the approved preview's trajectories, compressed to 1.4 s.
+        let t = CGFloat(time / Self.duration * 2.4)
+        let bounds = CGRect(origin: .zero, size: card.size)
+        material.clear(bounds)
+        material.setBlendMode(.normal)
+        material.setFillColor(CGColor(gray: 1, alpha: 1))
+        // Interior discs are fully overlapped. Fill that known-solid area once,
+        // then draw the exact circular union only near the eroding edge.
+        let solidWidth = card.width * (1 - Self.clamp((t + 0.165) / 1.42, 0, 1))
+        if solidWidth > 0 { material.fill(CGRect(x: 0, y: 0, width: solidWidth, height: card.height)) }
+        material.beginPath()
+        for grain in grains where grain.x + grain.radius >= solidWidth {
+            let alive = Self.clamp((grain.birth - t) / 0.045, 0, 1)
+            guard alive > 0 else { continue }
+            let radius = grain.radius * sqrt(alive)
+            material.addEllipse(in: CGRect(x: grain.x - radius, y: grain.y - radius, width: radius * 2, height: radius * 2))
+        }
+        material.fillPath()
+        material.setBlendMode(.sourceIn)
+        material.draw(image, in: bounds)
+        material.setBlendMode(.normal)
+        if let remainder = material.makeImage() { context.draw(remainder, in: card) }
+
+        context.saveGState()
+        for p in particles {
+            let age = t - p.birth
+            guard age >= 0, age <= p.life else { continue }
+            let progress = age / p.life
+            let drift = p.vx * age * (0.4 + progress * 0.85)
+            let wave = sin(age * 9 + p.phase) - sin(p.phase)
+            let x = card.minX + p.x + drift
+            // Canvas y points down; CoreGraphics y points up.
+            let y = card.minY + p.y - p.vy * age - wave * p.swirl * progress
+            let diameter = p.size * (1 - progress * 0.4)
+            context.setAlpha(pow(1 - progress, 0.8) * p.alpha)
+            context.setFillColor(p.color)
+            context.fillEllipse(in: CGRect(x: x - diameter / 2, y: y - diameter / 2, width: diameter, height: diameter))
         }
         context.restoreGState()
-
-        guard time >= 0.075 else { return }
-        for index in 0..<36 {
-            let seed = CGFloat((index * 37 + 11) % 101) / 100
-            let birth = 0.085 + Double(index % 4) * 0.009
-            let p = progress(time, from: birth, to: duration - Double(index % 3) * 0.025)
-            guard p > 0, p < 1 else { continue }
-            let start = boundaryPoint(fraction: CGFloat(index) / 36, rect: card)
-            let dx = start.x - center.x, dy = start.y - center.y
-            let distance = max(1, hypot(dx, dy)), nx = dx / distance, ny = dy / distance
-            let travel = (30 + seed * 60) * easeOut(p)
-            let curl = sin(p * .pi) * (seed - 0.5) * 22
-            let point = CGPoint(x: start.x + nx * travel - ny * curl,
-                                y: start.y + ny * travel + nx * curl - 28 * p * p)
-            let alpha = min(1, p / 0.08) * pow(1 - p, 1.4)
-            let color = index % 3 == 0
-                ? CGColor(red: 0.55, green: 0.78, blue: 1, alpha: alpha * 0.85)
-                : CGColor(red: 0.96, green: 0.75 + seed * 0.2, blue: 0.96, alpha: alpha * 0.8)
-            context.saveGState()
-            context.translateBy(x: point.x, y: point.y)
-            context.rotate(by: atan2(ny, nx) + p * (seed - 0.5) * 4)
-            context.setShadow(offset: .zero, blur: 2, color: CGColor(gray: 1, alpha: alpha * 0.35))
-            if index % 3 == 0 {
-                // Curved strips of the broken rim, rather than square confetti.
-                let length = (6 + seed * 12) * (1 - p * 0.65)
-                context.move(to: CGPoint(x: 0, y: -length / 2))
-                context.addQuadCurve(to: CGPoint(x: 0, y: length / 2), control: CGPoint(x: 4 * (1 - p), y: 0))
-                context.setLineWidth(1.1 + seed * 0.6)
-                context.setLineCap(.round); context.setStrokeColor(color); context.strokePath()
-            } else {
-                // Tiny translucent droplets with a white specular highlight.
-                let r = (1.5 + seed * 2.7) * (1 - p * 0.75)
-                let drop = CGRect(x: -r, y: -r * 0.75, width: r * 2, height: r * 1.5)
-                context.setFillColor(CGColor(red: 0.8, green: 0.91, blue: 1, alpha: alpha * 0.24))
-                context.fillEllipse(in: drop)
-                context.setStrokeColor(color); context.setLineWidth(0.8); context.strokeEllipse(in: drop)
-                context.setFillColor(CGColor(gray: 1, alpha: alpha))
-                context.fillEllipse(in: CGRect(x: -r * 0.45, y: r * 0.1, width: max(0.7, r * 0.55), height: max(0.7, r * 0.4)))
-            }
-            context.restoreGState()
-        }
     }
 
-    static func progress(_ time: TimeInterval, from start: TimeInterval, to end: TimeInterval) -> CGFloat {
-        CGFloat(min(1, max(0, (time - start) / (end - start))))
+    private static func clamp(_ value: CGFloat, _ lower: CGFloat, _ upper: CGFloat) -> CGFloat {
+        min(upper, max(lower, value))
     }
-    private static func easeOut(_ value: CGFloat) -> CGFloat { 1 - pow(1 - value, 2) }
-
-    private static func rupturePath(center: CGPoint, radius: CGFloat) -> CGPath {
-        let path = CGMutablePath()
-        for index in 0..<72 {
-            let angle = CGFloat(index) / 72 * .pi * 2
-            let r = radius * (1 + 0.055 * sin(angle * 3 + 0.6) + 0.025 * sin(angle * 7))
-            let point = CGPoint(x: center.x + cos(angle) * r, y: center.y + sin(angle) * r)
-            if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
-        }
-        path.closeSubpath()
-        return path
-    }
-
-    static func boundaryPoint(fraction: CGFloat, rect: CGRect) -> CGPoint {
-        let r = min(16, min(rect.width, rect.height) / 2)
-        let w = max(0, rect.width - r * 2), h = max(0, rect.height - r * 2), arc = .pi * r / 2
-        var d = (fraction - floor(fraction)) * (2 * w + 2 * h + 4 * arc)
-        let lengths = [w, arc, h, arc, w, arc, h, arc]
-        for segment in 0..<8 {
-            if d <= lengths[segment] {
-                switch segment {
-                case 0: return CGPoint(x: rect.minX + r + d, y: rect.minY)
-                case 2: return CGPoint(x: rect.maxX, y: rect.minY + r + d)
-                case 4: return CGPoint(x: rect.maxX - r - d, y: rect.maxY)
-                case 6: return CGPoint(x: rect.minX, y: rect.maxY - r - d)
-                default:
-                    let centers = [CGPoint(x: rect.maxX - r, y: rect.minY + r), CGPoint(x: rect.maxX - r, y: rect.maxY - r),
-                                   CGPoint(x: rect.minX + r, y: rect.maxY - r), CGPoint(x: rect.minX + r, y: rect.minY + r)]
-                    let corner = segment / 2
-                    let angle = -.pi / 2 + CGFloat(corner) * .pi / 2 + d / max(r, 0.001)
-                    return CGPoint(x: centers[corner].x + cos(angle) * r, y: centers[corner].y + sin(angle) * r)
-                }
-            }
-            d -= lengths[segment]
-        }
-        return CGPoint(x: rect.minX + r, y: rect.minY)
+    private static func noise(_ x: CGFloat, _ y: CGFloat) -> CGFloat {
+        let value = sin(x * 127.1 + y * 311.7 + 18.3) * 43758.5453123
+        return value - floor(value)
     }
 }

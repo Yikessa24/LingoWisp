@@ -136,3 +136,10 @@ open build/Distribution/HoldTranslate.app --args --smoke-test --diagnostic-repor
 - 58 项 XCTest 通过，包括破裂中断生命周期、拖动几何边界和实际像素检查。5 组真实 Translation 视觉检查通过，长短布局保持不变。
 - `zsh scripts/burst-preview.sh` 使用固定合成翻译截图和生产渲染器生成 `bubble-burst.gif` / `bubble-burst-frames.png`；预览不是桌面录屏。已逐帧检查并修正膜面裁切。
 - Release arm64/x86_64 构建及固定路径签名验证通过，1.3.0 已安装并恢复辅助功能信任；真实三指移动和动画观感等待用户反馈。
+
+## 1.3.1 圆形粒子动效专项
+- 按用户要求只验证此次动效，未重跑手势、翻译、语言、拖动或其他已通过测试。
+- `swift test --filter 'BubbleBurstRendererTests|BubbleLifetimeTests'`：6 项、0 失败。检查右侧先碎裂、左侧保持、粒子仅向右、1.4 秒终点无残留、关闭清理、新译文打断旧动画与减少动态效果。
+- 生产渲染器导出 GIF 和 6 帧图片，确认连接处遮罩与飘出粒子均为圆形，无方格边缘；保留当前确认的颗粒尺寸与轨迹，整体速度压缩至约 1.4 秒。
+- 仅针对动效做 2× 离屏绘制测量：短/长气泡平均帧耗时 6.06/17.56ms，P95 为 10.45/30.50ms；准备时间 3.95/6.74ms。离屏软件绘制耗时不等同于实际屏幕帧率，结束按 1.4 秒时钟控制。
+- Release universal 构建与签名校验通过，1.3.1 已安装至原路径，原有辅助功能信任已恢复。

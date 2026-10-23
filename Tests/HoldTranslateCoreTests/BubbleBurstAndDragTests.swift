@@ -30,39 +30,54 @@ final class BubbleDragPlacementTests: XCTestCase {
 }
 
 final class BubbleBurstRendererTests: XCTestCase {
+    private let card = CGRect(x: 240, y: 240, width: 358, height: 128)
     private func context() -> CGContext {
-        CGContext(data: nil, width: 578, height: 348, bitsPerComponent: 8, bytesPerRow: 578 * 4,
+        CGContext(data: nil, width: 838, height: 608, bitsPerComponent: 8, bytesPerRow: 838 * 4,
                   space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
     }
-    func testRuptureActuallyRemovesFilmAndEmitsParticlesOutsideCard() {
+    private func renderer() -> BubbleBurstRenderer {
         let fixture = context()
-        fixture.setFillColor(CGColor(gray: 0.6, alpha: 1))
-        fixture.fill(CGRect(x: 0, y: 0, width: 578, height: 348))
-        let image = fixture.makeImage()!
-        let card = CGRect(x: 110, y: 110, width: 358, height: 128)
-        func pixels(_ time: Double) -> (inside: Int, outside: Int) {
-            let ctx = context()
-            BubbleBurstRenderer.draw(in: ctx, image: image, card: card, time: time)
-            let bytes = ctx.data!.assumingMemoryBound(to: UInt8.self)
-            var inside = 0, outside = 0
-            for y in 0..<348 { for x in 0..<578 where bytes[(y * 578 + x) * 4 + 3] > 0 {
-                if card.contains(CGPoint(x: x, y: y)) { inside += 1 } else { outside += 1 }
-            } }
-            return (inside, outside)
-        }
-        let intact = pixels(0), torn = pixels(0.13), scattered = pixels(0.30), ended = pixels(0.62)
-        XCTAssertGreaterThan(intact.inside, 40_000)
-        XCTAssertLessThan(torn.inside, intact.inside / 2)
-        XCTAssertGreaterThan(scattered.outside, 50)
-        XCTAssertLessThan(scattered.inside, 500)
-        XCTAssertEqual(ended.inside + ended.outside, 0)
+        fixture.setFillColor(CGColor(gray: 0.8, alpha: 1))
+        fixture.fill(CGRect(x: 0, y: 0, width: 838, height: 608))
+        return BubbleBurstRenderer(image: fixture.makeImage()!, card: card)!
     }
-    func testRimParticlesStartOnRoundedBoundary() {
-        let rect = CGRect(x: 110, y: 110, width: 358, height: 128)
-        for index in 0..<100 {
-            let point = BubbleBurstRenderer.boundaryPoint(fraction: CGFloat(index) / 100, rect: rect)
-            XCTAssertTrue(rect.insetBy(dx: -0.01, dy: -0.01).contains(point))
-            XCTAssertFalse(rect.insetBy(dx: 16.1, dy: 16.1).contains(point))
+    func testRightEdgeErodesFirstAndDustOnlyTravelsRight() {
+        let renderer = renderer(), ctx = context()
+        renderer.draw(in: ctx, time: 0.4)
+        let bytes = ctx.data!.assumingMemoryBound(to: UInt8.self)
+        var leftSolid = 0, rightSolid = 0, escapedRight = 0, escapedLeft = 0
+        for y in 0..<608 { for x in 0..<838 {
+            let alpha = bytes[(y * 838 + x) * 4 + 3]
+            if y >= 240 && y < 368 && alpha > 220 {
+                if x >= 240 && x < 359 { leftSolid += 1 }
+                if x >= 479 && x < 598 { rightSolid += 1 }
+            }
+            if alpha > 8 && x > 599 { escapedRight += 1 }
+            if alpha > 8 && x < 239 { escapedLeft += 1 }
+        } }
+        XCTAssertGreaterThan(leftSolid, 14_000)
+        XCTAssertLessThan(rightSolid, 1_000)
+        XCTAssertGreaterThan(escapedRight, 50)
+        XCTAssertEqual(escapedLeft, 0)
+    }
+    func testAllPixelsGoneWithinOneAndAHalfSeconds() {
+        let renderer = renderer()
+        XCTAssertLessThanOrEqual(BubbleBurstRenderer.duration, 1.5)
+        for time in [BubbleBurstRenderer.duration, 1.5] {
+            let ctx = context()
+            renderer.draw(in: ctx, time: time)
+            let bytes = ctx.data!.assumingMemoryBound(to: UInt8.self)
+            XCTAssertFalse((0..<(838 * 608)).contains { bytes[$0 * 4 + 3] != 0 })
         }
+    }
+    func testInitialFrameKeepsWholeBubbleAndTailRetainsOnlyDust() {
+        let renderer = renderer()
+        func opaqueCount(_ time: Double) -> Int {
+            let ctx = context(); renderer.draw(in: ctx, time: time)
+            let bytes = ctx.data!.assumingMemoryBound(to: UInt8.self)
+            return (0..<(838 * 608)).filter { bytes[$0 * 4 + 3] > 220 }.count
+        }
+        XCTAssertGreaterThan(opaqueCount(0), 45_000)
+        XCTAssertLessThan(opaqueCount(1.0), 100)
     }
 }

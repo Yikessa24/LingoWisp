@@ -221,8 +221,8 @@ final class TranslationPanel: NSPanel {
             view.layoutSubtreeIfNeeded()
             if let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
                 view.cacheDisplay(in: view.bounds, to: bitmap)
-                if let image = bitmap.cgImage {
-                    let effect = BubbleBurstEffect(image: image, frame: panel.frame, completion: finish)
+                if let image = bitmap.cgImage,
+                   let effect = BubbleBurstEffect(image: image, frame: panel.frame, completion: finish) {
                     burst = effect
                     effect.start()
                     panel.orderOut(nil)

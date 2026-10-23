@@ -74,7 +74,7 @@ struct SettingsView: View {
                     Picker("翻译为", selection: $preferences.target) { ForEach(TargetChoice.allCases) { Text($0.title).tag($0) } }
                 } header: { Text("翻译") }
                 Section {
-                    Text("译文气泡保持显示，拖动顶部可移动（支持三指拖移）。点击 ×，或在气泡内双指右滑，气泡会破裂消失。")
+                    Text("译文气泡保持显示，拖动顶部可移动（支持三指拖移）。点击 ×，或在气泡内双指右滑，气泡会从右侧碎成圆形粒子并向右飘散。")
                         .font(.caption).foregroundStyle(.secondary)
                     Toggle("显示原文摘要", isOn: $preferences.showOriginal)
                     Toggle("登录时启动", isOn: Binding(get: { model.loginEnabled }, set: { model.setLogin($0) }))
