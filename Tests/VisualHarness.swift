@@ -13,7 +13,7 @@ import SwiftUI
     private var bubble: BubbleController!
     private var defaults: UserDefaults!
     private var started = Date()
-    private let suite = "HoldTranslate.VisualTests"
+    private let suite = "LingoWisp.VisualTests"
     private var captured = false
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -35,7 +35,7 @@ import SwiftUI
             model.state = .result("这是一个学习新事物的好日子。你可以选择这段译文的一部分，然后复制。")
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(250))
-                let board = NSPasteboard(name: .init("HoldTranslateSelectionVerification"))
+                let board = NSPasteboard(name: .init("LingoWispSelectionVerification"))
                 board.clearContents(); board.setString("selection-test-not-copied", forType: .string)
                 @MainActor func redirectCopy(in view: NSView) {
                     if let text = view as? TranslationTextView { text.copyPasteboard = board }

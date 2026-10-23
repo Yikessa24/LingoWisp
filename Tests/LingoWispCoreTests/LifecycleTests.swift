@@ -1,6 +1,6 @@
 import XCTest
 import AppKit
-@testable import HoldTranslateCore
+@testable import LingoWispCore
 
 final class LifecycleTests: XCTestCase {
     @MainActor func testLateResponsesNeverOverwriteCurrentRequest() async {
@@ -69,7 +69,7 @@ final class LifecycleTests: XCTestCase {
         XCTAssertTrue(TriggerKey.optionCommand.matches([.option, .command]))
     }
     @MainActor func testPreferencesPersistWithoutTextHistory() async {
-        let name = "HoldTranslateTests-" + UUID().uuidString
+        let name = "LingoWispTests-" + UUID().uuidString
         let defaults = UserDefaults(suiteName: name)!
         defer { defaults.removePersistentDomain(forName: name) }
         let preferences = Preferences(defaults: defaults)

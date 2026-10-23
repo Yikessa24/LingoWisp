@@ -1,6 +1,6 @@
 import XCTest
 import AppKit
-@testable import HoldTranslateCore
+@testable import LingoWispCore
 
 final class ThreeFingerDragTests: XCTestCase {
     func testLogicalMouseUpAfterReleasingOptionCompletesProvenDrag() {
@@ -64,7 +64,7 @@ final class ThreeFingerDragTests: XCTestCase {
         XCTAssertFalse(gesture.up(at: CGPoint(x: 180, y: 0), time: 1.8, matches: true))
     }
     @MainActor func testMonitorAcceptsThreeFingerSequenceAndKeepsDiagnosticAcrossOrdinaryClicks() async {
-        let suite = "HoldTranslateThreeFinger-" + UUID().uuidString
+        let suite = "LingoWispThreeFinger-" + UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         var pointer = CGPoint(x: 100, y: 200)

@@ -1,7 +1,7 @@
 import XCTest
 import AppKit
 import Carbon
-@testable import HoldTranslateCore
+@testable import LingoWispCore
 
 final class KeyboardShortcutTests: XCTestCase {
     @MainActor private func key(_ code: UInt16 = 2, _ flags: NSEvent.ModifierFlags = .option,
@@ -29,7 +29,7 @@ final class KeyboardShortcutTests: XCTestCase {
     }
 
     @MainActor func testCustomShortcutPersistsAndInvalidPreferencesRecoverToDefault() throws {
-        let suite = "HoldTranslateShortcutTests-" + UUID().uuidString
+        let suite = "LingoWispShortcutTests-" + UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         XCTAssertEqual(Preferences(defaults: defaults).shortcut, .selectionDefault)

@@ -4,13 +4,13 @@ cd "${0:A:h:h}"
 app="$PWD/build/VisualTests.app"
 mkdir -p "$app/Contents/MacOS" docs/screenshots
 xcrun swiftc -target arm64-apple-macos15.0 -swift-version 5 -parse-as-library \
-  HoldTranslate/Core/*.swift HoldTranslate/App/Preferences.swift \
-  HoldTranslate/App/TranslationModel.swift HoldTranslate/App/BubbleView.swift HoldTranslate/App/BubbleBurstEffect.swift \
-  HoldTranslate/App/SelectableTranslationText.swift Tests/VisualHarness.swift \
+  LingoWisp/Core/*.swift LingoWisp/App/Preferences.swift \
+  LingoWisp/App/TranslationModel.swift LingoWisp/App/BubbleView.swift LingoWisp/App/BubbleBurstEffect.swift \
+  LingoWisp/App/SelectableTranslationText.swift Tests/VisualHarness.swift \
   -o "$app/Contents/MacOS/VisualTests"
 cat > "$app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>
-<key>CFBundleIdentifier</key><string>com.yikessa.HoldTranslate.VisualTests</string>
+<key>CFBundleIdentifier</key><string>com.yikessa.LingoWisp.VisualTests</string>
 <key>CFBundleExecutable</key><string>VisualTests</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>15.0</string>

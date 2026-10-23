@@ -1,6 +1,6 @@
 import XCTest
 import AppKit
-@testable import HoldTranslateCore
+@testable import LingoWispCore
 
 final class BubbleDragPlacementTests: XCTestCase {
     func testHeaderDragRegionExcludesActionButtonsAndTranslationBody() {

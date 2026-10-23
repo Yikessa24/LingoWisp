@@ -12,14 +12,14 @@ def add(name, value):
     objects.append(f'{key} = {{ {value} }};')
     return key
 def refs(items): return '(' + ', '.join(items) + ',)'
-sources = sorted((root / 'HoldTranslate').rglob('*.swift'))
+sources = sorted((root / 'LingoWisp').rglob('*.swift'))
 file_ids, build_ids = [], []
 for source in sources:
     rel = str(source.relative_to(root))
     fid = add(rel, f'isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "{rel}"; sourceTree = SOURCE_ROOT;')
     file_ids.append(fid)
     build_ids.append(add('build:'+rel, f'isa = PBXBuildFile; fileRef = {fid};'))
-icon = add('icon', 'isa = PBXFileReference; lastKnownFileType = image.icns; path = HoldTranslate/Resources/AppIcon.icns; sourceTree = SOURCE_ROOT;')
+icon = add('icon', 'isa = PBXFileReference; lastKnownFileType = image.icns; path = LingoWisp/Resources/AppIcon.icns; sourceTree = SOURCE_ROOT;')
 icon_build = add('iconBuild', f'isa = PBXBuildFile; fileRef = {icon};')
 file_ids.append(icon)
 product = add('product', 'isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LingoWisp.app; sourceTree = BUILT_PRODUCTS_DIR;')
@@ -33,7 +33,7 @@ proj_configs, target_configs = [], []
 for mode in ['Debug', 'Release']:
     opt = '-Onone' if mode == 'Debug' else '-O'
     proj_configs.append(add('project'+mode, f'isa = XCBuildConfiguration; name = {mode}; buildSettings = {{ MACOSX_DEPLOYMENT_TARGET = 15.0; SDKROOT = macosx; CLANG_ENABLE_MODULES = YES; SWIFT_VERSION = 5.0; SWIFT_STRICT_CONCURRENCY = complete; SWIFT_OPTIMIZATION_LEVEL = "{opt}"; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; }};'))
-    target_configs.append(add('target'+mode, f'isa = XCBuildConfiguration; name = {mode}; buildSettings = {{ PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = com.yikessa.HoldTranslate; INFOPLIST_FILE = HoldTranslate/Resources/Info.plist; GENERATE_INFOPLIST_FILE = NO; CODE_SIGN_IDENTITY = "-"; CODE_SIGN_STYLE = Manual; ENABLE_APP_SANDBOX = NO; ENABLE_HARDENED_RUNTIME = YES; SWIFT_EMIT_LOC_STRINGS = NO; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks"; }};'))
+    target_configs.append(add('target'+mode, f'isa = XCBuildConfiguration; name = {mode}; buildSettings = {{ PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = com.yikessa.HoldTranslate; INFOPLIST_FILE = LingoWisp/Resources/Info.plist; GENERATE_INFOPLIST_FILE = NO; CODE_SIGN_IDENTITY = "-"; CODE_SIGN_STYLE = Manual; ENABLE_APP_SANDBOX = NO; ENABLE_HARDENED_RUNTIME = YES; SWIFT_EMIT_LOC_STRINGS = NO; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks"; }};'))
 pl = add('projectConfigs', f'isa = XCConfigurationList; buildConfigurations = {refs(proj_configs)}; defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;')
 tl = add('targetConfigs', f'isa = XCConfigurationList; buildConfigurations = {refs(target_configs)}; defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;')
 target = add('target', f'isa = PBXNativeTarget; buildConfigurationList = {tl}; buildPhases = {refs([phase,frameworks,resources])}; buildRules = (); dependencies = (); name = LingoWisp; productName = LingoWisp; productReference = {product}; productType = "com.apple.product-type.application";')

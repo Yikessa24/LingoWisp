@@ -9,7 +9,7 @@
 
 ## 真实跨应用验证步骤
 
-先将应用放到固定路径启动，进入菜单栏 → 设置 → 前往授权，在「隐私与安全性 → 辅助功能」开启 HoldTranslate。回到设置检查状态。不要给屏幕录制权限。
+先将应用放到固定路径启动，进入菜单栏 → 设置 → 前往授权，在「隐私与安全性 → 辅助功能」开启译泡（LingoWisp）。回到设置检查状态。不要给屏幕录制权限。
 
 在设置中点击「准备语言包」，接受 macOS 的下载确认。等待完成。回到原应用，选中下列测试文本：
 
@@ -19,7 +19,7 @@
 - 日语：今日はとても良い天気です。
 - 单词：hello
 
-先验证先选中再按 ⌥D；再按住 Option 拖动划选并松开鼠标。Option 与应用选择行为冲突时切换 Control / Option+Command。划选保持只读监听；⌥D 使用系统全局快捷键注册，由 HoldTranslate 处理，可在设置自定义。
+先验证先选中再按 ⌥D；再按住 Option 拖动划选并松开鼠标。Option 与应用选择行为冲突时切换 Control / Option+Command。划选保持只读监听；⌥D 使用系统全局快捷键注册，由译泡处理，可在设置自定义。
 
 | 场景 | 验收条件 | 当前状态 |
 |---|---|---|
@@ -64,7 +64,7 @@
 显式合成文本烟雾测试（不读取其他应用内容）：
 
 ```sh
-open build/Distribution/HoldTranslate.app --args --smoke-test --diagnostic-report "$PWD/build/smoke-report.json"
+open build/Distribution/LingoWisp.app --args --smoke-test --diagnostic-report "$PWD/build/smoke-report.json"
 ```
 
 仅启动参数指定报告路径时写入状态 JSON；不记录原文或译文。先退出旧实例再运行。`--settings` 显示设置，`--dark` / `--light` 只覆盖本应用外观，不改变系统主题。
@@ -156,3 +156,7 @@ open build/Distribution/HoldTranslate.app --args --smoke-test --diagnostic-repor
 - 译泡 · LingoWisp universal Release 构建、签名和 ZIP 完整性通过；核对 `CFBundleDisplayName`、`CFBundleName`、执行文件、版本 1.4.1/build 9，以及保持不变的应用标识。
 - 实际安装界面确认设置标题、品牌名、介绍语、⌥D 与现有偏好仍在；辅助功能已切换到新安装路径，并由应用内部确认已授权。
 - 本次只更改品牌及构建输出。未重跑翻译、全局输入、复制、拖移与动效等既有功能测试。
+
+## 1.4.2 源码命名与路径检查
+- 源码、入口文件、测试目录与 Swift Package 模块统一更名。`swift build --build-tests` 编译通过，验证新路径和测试导入；没有重新执行功能测试。
+- Release universal 构建、签名及 ZIP 完整性检查通过。新安装版本 1.4.2/build 10 内部确认辅助功能已授权，保留既有快捷键。

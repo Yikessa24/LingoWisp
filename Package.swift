@@ -1,11 +1,11 @@
 // swift-tools-version: 6.0
 import PackageDescription
 let package = Package(
-    name: "HoldTranslateCore",
+    name: "LingoWispCore",
     platforms: [.macOS(.v15)],
-    products: [.library(name: "HoldTranslateCore", targets: ["HoldTranslateCore"])],
+    products: [.library(name: "LingoWispCore", targets: ["LingoWispCore"])],
     targets: [
-        .target(name: "HoldTranslateCore", path: "HoldTranslate", exclude: ["App/HoldTranslateApp.swift", "Resources"]),
-        .testTarget(name: "HoldTranslateCoreTests", dependencies: ["HoldTranslateCore"], path: "Tests/HoldTranslateCoreTests")
+        .target(name: "LingoWispCore", path: "LingoWisp", exclude: ["App/LingoWispApp.swift", "Resources"]),
+        .testTarget(name: "LingoWispCoreTests", dependencies: ["LingoWispCore"], path: "Tests/LingoWispCoreTests")
     ]
 )

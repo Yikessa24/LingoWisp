@@ -6,6 +6,8 @@
 
 使用 SwiftUI、AppKit、Accessibility、NaturalLanguage 和 Apple Translation。无第三方依赖，无账号或 API Key，无翻译历史。
 
+[下载最新版本](https://github.com/Yikessa24/LingoWisp/releases/latest) · [GitHub 源码](https://github.com/Yikessa24/LingoWisp)
+
 原名 HoldTranslate。更名后沿用原应用标识，保留现有快捷键和偏好设置。旧版本的发布记录保留在历史 Release 中。
 
 ## 系统要求
@@ -27,6 +29,8 @@ open build/Distribution/LingoWisp.app
 ```sh
 swift test
 ```
+
+源码位于 `LingoWisp/`，应用入口为 `LingoWisp/App/LingoWispApp.swift`，测试位于 `Tests/LingoWispCoreTests/`。Swift Package 模块名为 `LingoWispCore`。
 
 提交的 Xcode 工程无需第三方生成器。添加 Swift 文件后可运行 `python3 scripts/generate-project.py` 重新生成工程。
 

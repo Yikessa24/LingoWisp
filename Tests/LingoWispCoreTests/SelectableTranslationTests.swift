@@ -1,12 +1,12 @@
 import XCTest
 import AppKit
-@testable import HoldTranslateCore
+@testable import LingoWispCore
 
 final class SelectableTranslationTests: XCTestCase {
     private final class FlippedContainer: NSView { override var isFlipped: Bool { true } }
     @MainActor func testSelectedSubstringCopiesWithoutEditingTranslation() {
         _ = NSApplication.shared
-        let board = NSPasteboard(name: .init("HoldTranslateSelection-" + UUID().uuidString))
+        let board = NSPasteboard(name: .init("LingoWispSelection-" + UUID().uuidString))
         defer { board.releaseGlobally() }
         let view = TranslationTextView(); view.copyPasteboard = board
         let text = "选择这一段 🌍，其余保留。"
@@ -19,7 +19,7 @@ final class SelectableTranslationTests: XCTestCase {
     }
     @MainActor func testCommandCopyAndSelectAllUseCurrentSelection() {
         _ = NSApplication.shared
-        let board = NSPasteboard(name: .init("HoldTranslateSelection-" + UUID().uuidString))
+        let board = NSPasteboard(name: .init("LingoWispSelection-" + UUID().uuidString))
         defer { board.releaseGlobally() }
         let view = TranslationTextView(); view.copyPasteboard = board
         view.setTranslation("First sentence. Second sentence.")
@@ -38,7 +38,7 @@ final class SelectableTranslationTests: XCTestCase {
     }
     @MainActor func testEmptySelectionKeepsClipboardAndViewRefreshPreservesSelection() {
         _ = NSApplication.shared
-        let board = NSPasteboard(name: .init("HoldTranslateSelection-" + UUID().uuidString))
+        let board = NSPasteboard(name: .init("LingoWispSelection-" + UUID().uuidString))
         defer { board.releaseGlobally() }
         board.setString("existing copy", forType: .string)
         let view = TranslationTextView(); view.copyPasteboard = board

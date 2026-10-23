@@ -1,6 +1,6 @@
 import XCTest
 import CoreGraphics
-@testable import HoldTranslateCore
+@testable import LingoWispCore
 
 final class GestureTests: XCTestCase {
     func testClickNeverTriggers() {

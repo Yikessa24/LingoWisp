@@ -1,6 +1,6 @@
 import XCTest
 import AppKit
-@testable import HoldTranslateCore
+@testable import LingoWispCore
 
 final class BubbleSwipeTests: XCTestCase {
     private func feed(_ tracker: inout BubbleSwipeTracker, x: CGFloat, y: CGFloat = 0,
@@ -59,7 +59,7 @@ final class BubbleSwipeTests: XCTestCase {
 final class BubbleLifetimeTests: XCTestCase {
     @MainActor private func makeBubble(reduceMotion: Bool = false) -> (BubbleController, TranslationModel, UserDefaults, String) {
         _ = NSApplication.shared
-        let suite = "HoldTranslateBubbleTests-" + UUID().uuidString
+        let suite = "LingoWispBubbleTests-" + UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!
         // Old automatic/release settings must not revive automatic dismissal.
         defaults.set("release", forKey: "dismissMode")

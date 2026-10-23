@@ -1,11 +1,11 @@
 import XCTest
 import AppKit
-@testable import HoldTranslateCore
+@testable import LingoWispCore
 
 final class InputPipelineTests: XCTestCase {
     @MainActor func testDelayedEventsUseTheirOwnCoordinatesInsteadOfCurrentCursor() async {
-        let defaults = UserDefaults(suiteName: "HoldTranslateInputTests")!
-        defer { defaults.removePersistentDomain(forName: "HoldTranslateInputTests") }
+        let defaults = UserDefaults(suiteName: "LingoWispInputTests")!
+        defer { defaults.removePersistentDomain(forName: "LingoWispInputTests") }
         let monitor = InputMonitor(preferences: Preferences(defaults: defaults))
         var selected: [CGPoint] = []
         monitor.onSelection = { selected.append($0) }
@@ -40,7 +40,7 @@ final class InputPipelineTests: XCTestCase {
 }
 
 final class ClipboardCompatibilityTests: XCTestCase {
-    @MainActor private func board() -> NSPasteboard { NSPasteboard(name: .init("HoldTranslateTests-" + UUID().uuidString)) }
+    @MainActor private func board() -> NSPasteboard { NSPasteboard(name: .init("LingoWispTests-" + UUID().uuidString)) }
 
     @MainActor func testPreservesEveryItemAndFormatAfterSuccessfulCopy() async throws {
         let board = board()

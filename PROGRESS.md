@@ -1,4 +1,4 @@
-# HoldTranslate 开发记录
+# 译泡 · LingoWisp 开发记录
 
 ## 2026-10-23 · 环境与设计
 - 空目录启动；本机 macOS 26.6.2 / Apple Silicon，Xcode 27.1 / Swift 6.4，目标 macOS 15+。
@@ -8,7 +8,7 @@
 - 语言包缺失时引导用户主动在设置窗口下载；正常翻译浮窗不激活应用。
 
 ## 当前状态
-- 已完成可运行原生应用、设备端翻译、浮窗、设置和权限引导；源代码已首次推送私人仓库 https://github.com/Yikessa24/HoldTranslate 。
+- 已完成可运行原生应用、设备端翻译、浮窗、设置和权限引导；源代码已首次推送私人仓库 https://github.com/Yikessa24/LingoWisp 。
 - 最新 Release universal 1.3.1 已安装并恢复原有辅助功能信任，接入用户确认的圆形粒子效果，完整时长 1.4 秒。本次只执行 6 项动效专项测试，全部通过，未重复运行其他测试。
 - 用户已确认 TextEdit 译文和 1.0.2 三指拖移弹出翻译；微信兼容复制问题按用户要求暂停。
 - 无 Developer ID 签名或公证。已知限制、具体证据及剩余场景见 docs/TESTING.md。
@@ -141,3 +141,10 @@
 - Release arm64/x86_64 构建成功，核对显示名、执行文件、版本 1.4.1/build 9 和原 bundle ID；签名及 ZIP 完整性校验通过。仅验证更名与安装，未重复运行已通过的功能测试。
 - 已安装到 `~/Applications/LingoWisp.app`，旧 1.4.0 保留在忽略的 `build/PreviousInstall/` 中作为回退备份。实际界面确认新名称、介绍语与 ⌥D；系统辅助功能路径已刷新，应用内确认已授权。
 - 产物：`build/Distribution/LingoWisp-1.4.1-macOS.zip`，SHA-256：`4147d6310a18b5b3b532c73db29ab01eac44c1d9cf855b3169b2f468adc9d5d0`。
+
+## 2026-10-23 · 1.4.2：完整统一源码命名
+- 用户指出源码文件等仍有旧名，进一步将目录改为 `LingoWisp/`，入口改为 `LingoWispApp.swift`，测试目录/模块改为 `LingoWispCoreTests` / `LingoWispCore`；全部测试导入、构建及预览脚本同步更新。
+- README 补充新仓库/最新版下载链接与新的源码、测试目录说明；当前测试手册命令与开发记录标题同步更名。原系统标识和旧发布记录保留以兼容既有安装与历史校验值。
+- `swift build --build-tests` 编译成功，验证模块导入和全部测试源可编译；未执行原有功能测试。universal Release 构建、签名和 ZIP 完整性校验通过。
+- 1.4.2/build 10 已安装，新路径授权再次恢复，应用内部确认已授权；截图已更新。
+- 产物 SHA-256：`82c6213c4bc2febc36f2a70cab1ea9dde3805cba0f2bc31edb45d34f45a4df35`。
