@@ -15,6 +15,7 @@ import ApplicationServices
     private let reader = SelectionReader()
     private let clipboardReader = ClipboardSelectionReader()
     private let instanceLock = InstanceLock()
+    private let globalShortcut = GlobalShortcut()
     private var monitor: InputMonitor!
     private var bubble: BubbleController!
     private var statusItem: NSStatusItem!
@@ -32,7 +33,9 @@ import ApplicationServices
         if CommandLine.arguments.contains("--light") { NSApp.appearance = NSAppearance(named: .aqua) }
         bubble = BubbleController(model: translation, preferences: preferences)
         monitor = InputMonitor(preferences: preferences)
-        monitor.onGestureStatus = { [weak self] in self?.writeInputStatus($0) }
+        if CommandLine.arguments.contains("--input-report") {
+            monitor.onGestureStatus = { [weak self] in self?.writeInputStatus($0) }
+        }
         monitor.onSelection = { [weak self] in self?.translate(at: $0) }
         monitor.onOutsideClick = { [weak self] in self?.dismiss() }
         monitor.onTyping = { [weak self] in self?.dismiss() }
@@ -50,6 +53,16 @@ import ApplicationServices
         }
         translation.openPreparation = { [weak self] pair in
             self?.dismiss(); self?.settingsModel.preparationPair = pair; self?.showSettings()
+        }
+        globalShortcut.onPressed = { [weak self] in
+            guard let self, self.preferences.enabled, !self.settingsModel.recordingShortcut else { return }
+            self.writeInputStatus("selectionShortcut")
+            self.translate(at: NSEvent.mouseLocation)
+        }
+        settingsModel.applyShortcut = { [weak self] shortcut in self?.applyShortcut(shortcut) ?? false }
+        settingsModel.recordingChanged = { [weak self] recording in
+            if recording { self?.globalShortcut.stop() }
+            else { self?.configureShortcut() }
         }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "character.bubble", accessibilityDescription: "HoldTranslate")
@@ -99,7 +112,8 @@ import ApplicationServices
         // Opt-in troubleshooting only: one status record, no text, key contents,
         // app identifiers or absolute mouse positions.
         let report: [String: Any] = ["stage": stage, "accessibilityTrusted": AXIsProcessTrusted(),
-                                    "trigger": preferences.trigger.rawValue, "enabled": preferences.enabled]
+                                    "trigger": preferences.trigger.rawValue, "enabled": preferences.enabled,
+                                    "gesture": monitor?.lastGestureTrace ?? [:]]
         if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
             try? data.write(to: URL(fileURLWithPath: CommandLine.arguments[flag + 1]), options: .atomic)
         }
@@ -137,12 +151,28 @@ import ApplicationServices
     }
     private func configureMonitoring() {
         if preferences.enabled { monitor.start() } else { monitor.stop() }
+        configureShortcut()
+    }
+    private func configureShortcut() {
+        guard preferences.enabled, !settingsModel.recordingShortcut else { globalShortcut.stop(); return }
+        do { try globalShortcut.register(preferences.shortcut); settingsModel.shortcutError = nil }
+        catch { settingsModel.shortcutError = error.localizedDescription }
+    }
+    private func applyShortcut(_ shortcut: KeyboardShortcut) -> Bool {
+        do {
+            try globalShortcut.register(shortcut)
+            preferences.shortcut = shortcut
+            settingsModel.shortcutError = nil
+            if !preferences.enabled || settingsModel.recordingShortcut { globalShortcut.stop() }
+            updateMenu()
+            return true
+        } catch { settingsModel.shortcutError = error.localizedDescription; return false }
     }
     private func updateMenu() {
         let menu = NSMenu()
         let toggle = NSMenuItem(title: preferences.enabled ? "暂停划词翻译" : "恢复划词翻译", action: #selector(toggleEnabled), keyEquivalent: "")
         toggle.target = self; menu.addItem(toggle)
-        let hint = NSMenuItem(title: "先选中，再按 ⌃⌥⌘T", action: nil, keyEquivalent: "")
+        let hint = NSMenuItem(title: "先选中，再按 \(preferences.shortcut.display)", action: nil, keyEquivalent: "")
         menu.addItem(hint); menu.addItem(.separator())
         let settings = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self; menu.addItem(settings)
@@ -228,7 +258,7 @@ import ApplicationServices
         bubble?.hide(); monitor?.watchMovement(false)
     }
     func applicationWillTerminate(_ notification: Notification) {
-        dismiss(); monitor?.stop()
+        dismiss(); monitor?.stop(); globalShortcut.shutdown()
         for observer in observers { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
         observers.removeAll()
     }

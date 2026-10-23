@@ -24,6 +24,9 @@ enum DismissMode: String, CaseIterable, Identifiable {
 }
 
 @MainActor final class Preferences: ObservableObject {
+    @Published var shortcut: KeyboardShortcut {
+        didSet { if let data = try? JSONEncoder().encode(shortcut) { defaults.set(data, forKey: "selectionShortcut") } }
+    }
     @Published var enabled: Bool { didSet { save(enabled, "enabled") } }
     @Published var trigger: TriggerKey { didSet { save(trigger.rawValue, "trigger") } }
     @Published var target: TargetChoice { didSet { save(target.rawValue, "target") } }
@@ -33,6 +36,9 @@ enum DismissMode: String, CaseIterable, Identifiable {
     private let defaults: UserDefaults
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        if let data = defaults.data(forKey: "selectionShortcut"),
+           let stored = try? JSONDecoder().decode(KeyboardShortcut.self, from: data), stored.isValid { shortcut = stored }
+        else { shortcut = .selectionDefault }
         enabled = defaults.object(forKey: "enabled") as? Bool ?? true
         trigger = TriggerKey(rawValue: defaults.string(forKey: "trigger") ?? "") ?? .option
         target = TargetChoice(rawValue: defaults.string(forKey: "target") ?? "") ?? .automatic

@@ -4,6 +4,11 @@ import ServiceManagement
 @preconcurrency import Translation
 
 @MainActor final class SettingsModel: ObservableObject {
+    @Published var shortcutError: String?
+    @Published var recordingShortcut = false
+    var applyShortcut: ((KeyboardShortcut) -> Bool)?
+    var recordingChanged: ((Bool) -> Void)?
+    func setRecording(_ value: Bool) { recordingShortcut = value; recordingChanged?(value) }
     @Published var trusted = AXIsProcessTrusted()
     @Published var loginEnabled = SMAppService.mainApp.status == .enabled
     @Published var loginMessage: String?
@@ -51,7 +56,20 @@ struct SettingsView: View {
                 Section {
                     Toggle("启用划词翻译", isOn: $preferences.enabled)
                     Picker("划选时按住", selection: $preferences.trigger) { ForEach(TriggerKey.allCases) { Text($0.title).tag($0) } }
-                    Text("若 Option 改变了应用的选区行为，请换用其他修饰键，或先选中文字，再按 ⌃⌥⌘T。")
+                    HStack {
+                        Text("选中后翻译")
+                        Spacer()
+                        ShortcutRecorder(shortcut: preferences.shortcut,
+                                         commit: { model.applyShortcut?($0) ?? false },
+                                         recordingChanged: { model.setRecording($0) },
+                                         invalid: { model.shortcutError = ShortcutError.invalid.localizedDescription })
+                            .frame(width: 140, height: 26)
+                        Button("恢复默认") { _ = model.applyShortcut?(.selectionDefault) }
+                            .disabled(model.recordingShortcut)
+                    }
+                    if let error = model.shortcutError { Text(error).font(.caption).foregroundStyle(.orange) }
+                    if model.recordingShortcut { Text("按下新的组合键；Esc 取消。至少包含 Option、Control 或 Command。").font(.caption).foregroundStyle(.secondary) }
+                    Text("若 Option 改变了应用的选区行为，请换用其他修饰键，或先选中文字，再按 \(preferences.shortcut.display)。点击上方快捷键可自行修改。")
                         .font(.caption).foregroundStyle(.secondary)
                     Picker("翻译为", selection: $preferences.target) { ForEach(TargetChoice.allCases) { Text($0.title).tag($0) } }
                 } header: { Text("翻译") }
@@ -88,7 +106,8 @@ struct SettingsView: View {
             HStack {
                 Text("macOS 原生 · 无账号 · 无历史记录").font(.caption2).foregroundStyle(.tertiary)
                 Spacer()
-                Text("1.0.1").font(.caption2).foregroundStyle(.tertiary)
+                Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
+                    .font(.caption2).foregroundStyle(.tertiary)
             }.padding(.horizontal, 24).padding(.vertical, 14)
         }
         .frame(width: 510, height: 650)
