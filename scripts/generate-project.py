@@ -19,12 +19,15 @@ for source in sources:
     fid = add(rel, f'isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "{rel}"; sourceTree = SOURCE_ROOT;')
     file_ids.append(fid)
     build_ids.append(add('build:'+rel, f'isa = PBXBuildFile; fileRef = {fid};'))
+icon = add('icon', 'isa = PBXFileReference; lastKnownFileType = image.icns; path = HoldTranslate/Resources/AppIcon.icns; sourceTree = SOURCE_ROOT;')
+icon_build = add('iconBuild', f'isa = PBXBuildFile; fileRef = {icon};')
+file_ids.append(icon)
 product = add('product', 'isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HoldTranslate.app; sourceTree = BUILT_PRODUCTS_DIR;')
 products = add('products', f'isa = PBXGroup; children = {refs([product])}; name = Products; sourceTree = "<group>";')
 group = add('mainGroup', f'isa = PBXGroup; children = {refs(file_ids + [products])}; sourceTree = "<group>";')
 phase = add('sources', f'isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = {refs(build_ids)}; runOnlyForDeploymentPostprocessing = 0;')
 frameworks = add('frameworks', 'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;')
-resources = add('resources', 'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;')
+resources = add('resources', f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = {refs([icon_build])}; runOnlyForDeploymentPostprocessing = 0;')
 proj_configs, target_configs = [], []
 for mode in ['Debug', 'Release']:
     opt = '-Onone' if mode == 'Debug' else '-O'

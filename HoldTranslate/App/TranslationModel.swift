@@ -22,35 +22,52 @@ enum BubbleState: Equatable {
     private var availabilityTask: Task<Void, Never>?
     private var timeoutTask: Task<Void, Never>?
     private var generation = UUID()
+    private let analyzer = LanguageAnalyzer()
+    private let availability: @Sendable (LanguagePair) async -> LanguageAvailability.Status
+    private let timeout: Duration
+
+    init(timeout: Duration = .seconds(30), availability: @escaping @Sendable (LanguagePair) async -> LanguageAvailability.Status = { pair in await TranslationModel.languageStatus(pair) }) {
+        self.timeout = timeout
+        self.availability = availability
+    }
+
+    nonisolated static func languageStatus(_ pair: LanguagePair) async -> LanguageAvailability.Status {
+        let service: LanguageAvailability
+        if #available(macOS 26.4, *) { service = LanguageAvailability(preferredStrategy: .lowLatency) }
+        else { service = LanguageAvailability() }
+        return await service.status(from: Locale.Language(identifier: pair.source), to: Locale.Language(identifier: pair.target))
+    }
 
     func begin(text: String, target: TargetChoice) {
         reset()
         original = text
         state = .loading
         let token = generation
+        timeoutTask = Task {
+            try? await Task.sleep(for: timeout)
+            guard !Task.isCancelled, generation == token, state == .loading else { return }
+            generation = UUID()
+            availabilityTask?.cancel()
+            finish(.message("翻译暂时没有响应，请重试。"))
+        }
         availabilityTask = Task {
+            guard !Task.isCancelled, generation == token else { return }
             do {
-                let pair = try LanguagePolicy.pair(for: text, target: target)
+                let pair = try await analyzer.pair(for: text, target: target)
+                guard !Task.isCancelled, generation == token else { return }
                 self.pair = pair
-                let availability: LanguageAvailability
-                if #available(macOS 26.4, *) { availability = LanguageAvailability(preferredStrategy: .lowLatency) }
-                else { availability = LanguageAvailability() }
-                let status = await availability.status(from: Locale.Language(identifier: pair.source), to: Locale.Language(identifier: pair.target))
+                let status = await availability(pair)
                 guard !Task.isCancelled, generation == token else { return }
                 switch status {
-                case .installed:
-                    request = TranslationRequest(text: text, pair: pair)
-                    timeoutTask = Task {
-                        try? await Task.sleep(for: .seconds(30))
-                        guard !Task.isCancelled, self.generation == token, self.state == .loading else { return }
-                        self.request = nil
-                        self.finish(.message("翻译暂时没有响应，请重试。"))
-                    }
+                case .installed: request = TranslationRequest(text: text, pair: pair)
                 case .supported: finish(.needsDownload)
                 case .unsupported: finish(.message("系统暂不支持这个语言组合。"))
                 @unknown default: finish(.message("暂时无法确认语言包状态。"))
                 }
-            } catch { finish(.message(error.localizedDescription)) }
+            } catch {
+                guard !Task.isCancelled, generation == token else { return }
+                finish(.message(error.localizedDescription))
+            }
         }
     }
     func complete(_ result: String, id: UUID) {
@@ -64,6 +81,7 @@ enum BubbleState: Equatable {
     func message(_ message: String) { reset(); finish(.message(message)) }
     private func finish(_ state: BubbleState) {
         timeoutTask?.cancel(); timeoutTask = nil
+        request = nil
         self.state = state
         onChange?(); onFinished?()
     }
@@ -71,7 +89,7 @@ enum BubbleState: Equatable {
         generation = UUID()
         availabilityTask?.cancel(); availabilityTask = nil
         timeoutTask?.cancel(); timeoutTask = nil
-        request = nil; original = ""; pair = nil
+        request = nil; original = ""; pair = nil; state = .loading
     }
 }
 

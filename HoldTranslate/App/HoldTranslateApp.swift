@@ -24,6 +24,8 @@ import ApplicationServices
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        if CommandLine.arguments.contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
+        if CommandLine.arguments.contains("--light") { NSApp.appearance = NSAppearance(named: .aqua) }
         bubble = BubbleController(model: translation, preferences: preferences)
         monitor = InputMonitor(preferences: preferences)
         monitor.onSelection = { [weak self] in self?.translate(at: $0) }
@@ -36,7 +38,10 @@ import ApplicationServices
             self?.generation = UUID()
             self?.monitor.watchMovement(false)
         }
-        translation.onFinished = { [weak self] in self?.bubble.finished() }
+        translation.onFinished = { [weak self] in
+            self?.bubble.finished()
+            self?.recordDiagnosticResult()
+        }
         translation.openPreparation = { [weak self] pair in
             self?.dismiss(); self?.settingsModel.preparationPair = pair; self?.showSettings()
         }
@@ -67,10 +72,51 @@ import ApplicationServices
         NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification).sink { [weak self] _ in
             Task { @MainActor in self?.dismiss() }
         }.store(in: &subscriptions)
-        if !UserDefaults.standard.bool(forKey: "hasLaunched") {
+        if !UserDefaults.standard.bool(forKey: "hasLaunched") || CommandLine.arguments.contains("--settings") {
             UserDefaults.standard.set(true, forKey: "hasLaunched")
             showSettings()
         }
+        if CommandLine.arguments.contains("--smoke-test") {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1))
+                diagnosticFrontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+                translation.begin(text: "This is a beautiful day to learn something new.", target: .automatic)
+                let screen = NSScreen.main?.visibleFrame ?? .zero
+                bubble.show(anchor: CGRect(x: screen.midX, y: screen.midY, width: 1, height: 1))
+                writeDiagnostic(status: "started")
+            }
+        }
+    }
+    private var diagnosticFrontmost: String?
+    private var diagnosticFinished = false
+    private func recordDiagnosticResult() {
+        guard CommandLine.arguments.contains("--smoke-test"), !diagnosticFinished else { return }
+        diagnosticFinished = true
+        switch translation.state {
+        case .loading: break
+        case .result(let text): writeDiagnostic(status: text.isEmpty ? "emptyResult" : "translated")
+        case .needsDownload: writeDiagnostic(status: "needsDownload")
+        case .message: writeDiagnostic(status: "error")
+        }
+    }
+    private func writeDiagnostic(status: String) {
+        // Explicit developer smoke test only. Never writes selected or translated text.
+        guard let flag = CommandLine.arguments.firstIndex(of: "--diagnostic-report"),
+              CommandLine.arguments.indices.contains(flag + 1) else { return }
+        let report: [String: Any] = [
+            "status": status,
+            "accessibilityTrusted": AXIsProcessTrusted(),
+            "frontmostUnchanged": diagnosticFrontmost == NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+            "panelCanBecomeKey": bubble.canBecomeKey,
+            "timestamp": ISO8601DateFormatter().string(from: Date())
+        ]
+        if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
+            try? data.write(to: URL(fileURLWithPath: CommandLine.arguments[flag + 1]), options: .atomic)
+        }
+    }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showSettings()
+        return true
     }
     private func configureMonitoring() {
         if preferences.enabled { monitor.start() } else { monitor.stop() }
@@ -79,7 +125,7 @@ import ApplicationServices
         let menu = NSMenu()
         let toggle = NSMenuItem(title: preferences.enabled ? "暂停划词翻译" : "恢复划词翻译", action: #selector(toggleEnabled), keyEquivalent: "")
         toggle.target = self; menu.addItem(toggle)
-        let hint = NSMenuItem(title: "先选中，再按 ⇧⌘T", action: nil, keyEquivalent: "")
+        let hint = NSMenuItem(title: "先选中，再按 ⌃⌥⌘T", action: nil, keyEquivalent: "")
         menu.addItem(hint); menu.addItem(.separator())
         let settings = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self; menu.addItem(settings)
@@ -129,6 +175,7 @@ import ApplicationServices
                 translation.begin(text: text, target: preferences.target)
                 bubble.show(anchor: anchor)
                 monitor.watchMovement(true)
+                if !preferences.trigger.matches(NSEvent.modifierFlags) { bubble.released() }
             } catch {
                 guard valid(token: token, pid: pid) else { return }
                 if case SelectionError.secure = error { return }

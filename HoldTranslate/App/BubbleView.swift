@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import QuartzCore
 
 struct BubbleView: View {
     @ObservedObject var model: TranslationModel
@@ -40,10 +41,12 @@ struct BubbleView: View {
                     Text("正在翻译…").font(.system(size: 13)).foregroundStyle(.secondary)
                 }.padding(.vertical, 4)
             case .result(let result):
-                ViewThatFits(in: .vertical) {
+                if resultHeight(result) <= 270 {
                     resultText(result).fixedSize(horizontal: false, vertical: true)
-                    ScrollView { resultText(result) }.frame(height: 270)
-                }.frame(maxHeight: 270)
+                } else {
+                    ScrollView { resultText(result).fixedSize(horizontal: false, vertical: true) }
+                        .frame(height: 270)
+                }
             case .message(let message):
                 Text(message).font(.system(size: 13)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             case .needsDownload:
@@ -67,6 +70,15 @@ struct BubbleView: View {
             if let request = model.request { TranslationWorker(request: request, model: model).id(request.id) }
         }
     }
+    private func resultHeight(_ text: String) -> CGFloat {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = 5
+        return ceil((text as NSString).boundingRect(
+            with: CGSize(width: 322, height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: NSFont.systemFont(ofSize: 15), .paragraphStyle: paragraph]
+        ).height) + 2
+    }
     private func resultText(_ text: String) -> some View {
         Text(text).font(.system(size: 15)).lineSpacing(5)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -87,11 +99,13 @@ final class TranslationPanel: NSPanel {
     private var size = CGSize(width: 358, height: 160)
     private var dismissal: Task<Void, Never>?
     private var closeGeneration = UUID()
+    private var closeDeadline: Date?
     private var shownAt = Date.distantPast
     private(set) var hovering = false
     var onHide: (() -> Void)?
     var isVisible: Bool { panel.isVisible }
     var frame: CGRect { panel.frame }
+    var canBecomeKey: Bool { panel.canBecomeKey }
 
     init(model: TranslationModel, preferences: Preferences) {
         self.model = model; self.preferences = preferences
@@ -105,13 +119,20 @@ final class TranslationPanel: NSPanel {
         panel.animationBehavior = .none
         panel.setAccessibilityLabel("HoldTranslate 翻译")
         panel.contentView = NSHostingView(rootView: BubbleView(model: model, preferences: preferences, close: { [weak self] in self?.hide() }, hover: { [weak self] in self?.setHover($0) }, sizeChanged: { [weak self] size in self?.resize(size) }))
+        panel.contentView?.wantsLayer = true
     }
     func show(anchor: CGRect) {
-        dismissal?.cancel(); closeGeneration = UUID()
+        dismissal?.cancel(); dismissal = nil; closeDeadline = nil; closeGeneration = UUID()
         hovering = false; self.anchor = anchor; shownAt = Date()
         position()
         panel.alphaValue = 0
         panel.orderFrontRegardless()
+        if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            let scale = CABasicAnimation(keyPath: "transform.scale")
+            scale.fromValue = 0.985; scale.toValue = 1.0; scale.duration = 0.13
+            scale.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.contentView?.layer?.add(scale, forKey: "appear")
+        }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.13
             panel.animator().alphaValue = 1
@@ -137,21 +158,26 @@ final class TranslationPanel: NSPanel {
     }
     private func setHover(_ value: Bool) {
         hovering = value
-        if value { dismissal?.cancel(); dismissal = nil }
+        if value { dismissal?.cancel(); dismissal = nil; closeDeadline = nil }
         else if preferences.dismissMode != .manual { scheduleClose(after: preferences.dismissMode == .release ? 1.2 : 4) }
     }
     private func scheduleClose(after seconds: Double) {
-        guard isVisible, !hovering, dismissal == nil || preferences.dismissMode == .release else { return }
+        guard isVisible, !hovering else { return }
+        let deadline = Date().addingTimeInterval(seconds)
+        // Keep the earlier deadline. Mouse movement must not postpone dismissal,
+        // and moving away should be able to shorten the ordinary reading timer.
+        if let closeDeadline, closeDeadline <= deadline { return }
         dismissal?.cancel()
+        closeDeadline = deadline
         dismissal = Task { [weak self] in
             try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled, let self else { return }
-            self.dismissal = nil
+            self.dismissal = nil; self.closeDeadline = nil
             if !self.hovering { self.hide() }
         }
     }
     func hide() {
-        dismissal?.cancel(); dismissal = nil
+        dismissal?.cancel(); dismissal = nil; closeDeadline = nil
         guard panel.isVisible else { model.reset(); return }
         let token = UUID(); closeGeneration = token
         onHide?()

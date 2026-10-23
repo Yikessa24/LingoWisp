@@ -2,7 +2,7 @@ import Foundation
 import NaturalLanguage
 import CoreServices
 
-enum TargetChoice: String, CaseIterable, Identifiable {
+enum TargetChoice: String, CaseIterable, Identifiable, Sendable {
     case automatic, simplifiedChinese = "zh-Hans", english = "en", japanese = "ja", korean = "ko", french = "fr"
     var id: String { rawValue }
     var title: String {
@@ -82,5 +82,12 @@ struct LanguagePolicy {
         let destination = target == .automatic ? (source.hasPrefix("zh") ? "en" : "zh-Hans") : target.rawValue
         guard source != destination && !(source.hasPrefix("zh") && destination.hasPrefix("zh")) else { throw TextIssue.sameLanguage }
         return LanguagePair(source: source, target: destination)
+    }
+}
+
+/// Isolates NaturalLanguage and DictionaryServices work from the UI thread.
+actor LanguageAnalyzer {
+    func pair(for text: String, target: TargetChoice) throws -> LanguagePair {
+        try LanguagePolicy.pair(for: text, target: target)
     }
 }

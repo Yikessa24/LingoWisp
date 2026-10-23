@@ -51,7 +51,7 @@ struct SettingsView: View {
                 Section {
                     Toggle("启用划词翻译", isOn: $preferences.enabled)
                     Picker("划选时按住", selection: $preferences.trigger) { ForEach(TriggerKey.allCases) { Text($0.title).tag($0) } }
-                    Text("若 Option 改变了应用的选区行为，请换用其他修饰键，或先选中文字，再按 ⇧⌘T。")
+                    Text("若 Option 改变了应用的选区行为，请换用其他修饰键，或先选中文字，再按 ⌃⌥⌘T。")
                         .font(.caption).foregroundStyle(.secondary)
                     Picker("翻译为", selection: $preferences.target) { ForEach(TargetChoice.allCases) { Text($0.title).tag($0) } }
                 } header: { Text("翻译") }
@@ -101,12 +101,18 @@ struct PreparationWorker: View {
     @ObservedObject var model: SettingsModel
     let pair: LanguagePair
     let id: UUID
+    private var configuration: TranslationSession.Configuration {
+        let source = Locale.Language(identifier: pair.source)
+        let target = Locale.Language(identifier: pair.target)
+        if #available(macOS 26.4, *) { return .init(source: source, target: target, preferredStrategy: .lowLatency) }
+        return .init(source: source, target: target)
+    }
     var body: some View {
         Color.clear.frame(width: 1, height: 1)
-            .translationTask(.init(source: Locale.Language(identifier: pair.source), target: Locale.Language(identifier: pair.target))) { session in
+            .translationTask(configuration) { session in
                 do {
                     try await session.prepareTranslation()
-                    let status = await LanguageAvailability().status(from: Locale.Language(identifier: pair.source), to: Locale.Language(identifier: pair.target))
+                    let status = await TranslationModel.languageStatus(pair)
                     guard model.preparationID == id else { return }
                     model.preparationMessage = status == .installed ? "语言包已就绪。回到原应用划选即可翻译。" : "下载已请求。请等待系统完成下载后重试划词。"
                 } catch {

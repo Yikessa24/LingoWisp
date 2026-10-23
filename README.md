@@ -7,7 +7,7 @@
 ## 系统要求
 
 - macOS 15 或更新版本；优先 Apple Silicon。
-- 构建需要 Xcode 16 或更新版本（本项目实际使用 Xcode 27.1 编译）。
+- 构建需要 Xcode 26.4 或更新版本的 SDK（本项目实际使用 Xcode 27.1 编译）；应用运行最低为 macOS 15。
 - 需要辅助功能权限，且源应用必须通过 Accessibility 提供选中文字。
 - 首次使用需要联网下载系统翻译语言包。
 
@@ -18,7 +18,7 @@
 open build/Distribution/HoldTranslate.app
 ```
 
-也可以打开 `HoldTranslate.xcodeproj`，选择 HoldTranslate scheme 后运行。`Package.swift` 仅用于核心逻辑单元测试：
+也可以打开 `HoldTranslate.xcodeproj`，选择 HoldTranslate scheme 后运行。`Package.swift` 用于核心逻辑、请求生命周期和窗口行为单元测试：
 
 ```sh
 swift test
@@ -26,7 +26,7 @@ swift test
 
 提交的 Xcode 工程无需第三方生成器。添加 Swift 文件后可运行 `python3 scripts/generate-project.py` 重新生成工程。
 
-发布构建位于 `build/Distribution/HoldTranslate.app`，不提交构建缓存。建议复制到固定位置（例如 `~/Applications`）再授权和启用登录启动。移动或重新签名后，系统可能要求重新授权。
+发布构建位于 `build/Distribution/HoldTranslate.app`，不提交构建缓存。建议复制到固定位置（例如 `~/Applications`）再授权和启用登录启动。移动或重新签名后，系统可能要求重新授权。若开关已开启但应用仍提示未授权，请在辅助功能列表移除旧 HoldTranslate，再通过加号添加当前路径的应用；单纯关闭后再开启可能无法刷新旧 ad-hoc 签名记录。
 
 本地构建使用 ad-hoc 签名；**没有 Developer ID 签名或公证**，不能宣称通过 Gatekeeper 分发验证。若自行分发，请使用自己的开发者证书签名并公证。不要关闭系统安全保护。
 
@@ -35,7 +35,7 @@ swift test
 1. 启动后在设置中阅读权限说明，点击「前往授权」。在系统设置 → 隐私与安全性 → 辅助功能中开启 HoldTranslate。
 2. 回到设置，点击「准备语言包」，完成系统下载确认。
 3. 在其他应用按住 **⌥ Option**，拖动选中文字，然后松开鼠标。
-4. 也可以先选中文字，再按 **⇧⌘T**（Shift + Command + T）。
+4. 也可以先选中文字，再按 **⌃⌥⌘T**（Control + Option + Command + T）。
 5. 气泡不会激活应用。点击小复制按钮才会主动将译文写入剪贴板。
 
 Option 会影响某些应用的选区行为（例如矩形选择）。可切换到 Control 或 Option + Command；Control 也可能触发原应用上下文菜单。监听器只观察，不吞掉或修改输入。因此兼容快捷键在某些应用中也会触发原应用命令。
@@ -69,3 +69,20 @@ Option 会影响某些应用的选区行为（例如矩形选择）。可切换�
 详见 [测试记录与手工步骤](docs/TESTING.md) 和 [开发进度](PROGRESS.md)。Safari、Chrome、Notes、Pages、Finder、PDF 是否可读取取决于它们实际暴露的 AX 选区；不支持的界面会提示，不通过模拟复制伪装成功。
 
 最低目标是 macOS 15，但本机只能实际运行 macOS 26.6.2；旧系统和物理多显示器验证仍需要对应设备。不同系统版本和语言包状态可能影响速度、语言支持和离线可用性。
+
+
+## 已验证的界面
+
+以下图片由生产气泡视图和真实 Apple Translation 响应生成，使用固定合成测试文本，不含用户文档。它们是应用视图渲染截图，不是全屏截图。
+
+![浅色英译中](docs/screenshots/translation-light.png)
+![深色英译中](docs/screenshots/translation-dark.png)
+![中译英](docs/screenshots/chinese-to-english.png)
+
+设备端视觉集成测试（先安装英语与简体中文语言资源）：
+
+```sh
+./scripts/visual-test.sh
+```
+
+覆盖英译中、深色外观、中译英、单词和长文本；短译文过高或长文无界增长会令测试失败。`--traditional` 额外测试繁体中文，需要对应系统语言资源。

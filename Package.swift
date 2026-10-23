@@ -5,7 +5,7 @@ let package = Package(
     platforms: [.macOS(.v15)],
     products: [.library(name: "HoldTranslateCore", targets: ["HoldTranslateCore"])],
     targets: [
-        .target(name: "HoldTranslateCore", path: "HoldTranslate/Core"),
+        .target(name: "HoldTranslateCore", path: "HoldTranslate", exclude: ["App/HoldTranslateApp.swift", "Resources"]),
         .testTarget(name: "HoldTranslateCoreTests", dependencies: ["HoldTranslateCore"], path: "Tests/HoldTranslateCoreTests")
     ]
 )

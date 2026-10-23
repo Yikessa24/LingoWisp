@@ -53,7 +53,7 @@ import AppKit
         case .flagsChanged:
             if !matches { gesture.reset(); onRelease?() }
         case .keyDown:
-            if event.keyCode == 17 && event.modifierFlags.intersection([.command, .shift, .option, .control]) == [.command, .shift] && !event.isARepeat {
+            if event.keyCode == 17 && event.modifierFlags.intersection([.command, .shift, .option, .control]) == [.control, .option, .command] && !event.isARepeat {
                 onSelection?(point)
             } else { onTyping?() }
         case .rightMouseDown, .otherMouseDown, .scrollWheel: onOutsideClick?()

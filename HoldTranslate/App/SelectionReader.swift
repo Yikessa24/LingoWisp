@@ -12,7 +12,7 @@ enum SelectionError: Error, LocalizedError {
         switch self {
         case .permission: "需要辅助功能权限。请在菜单栏打开设置。"
         case .secure: "出于隐私保护，已跳过安全输入区域。"
-        case .unavailable: "此应用未提供可访问的选区。可尝试先选中，再按 ⇧⌘T。"
+        case .unavailable: "此应用未提供可访问的选区。可尝试先选中，再按 ⌃⌥⌘T。"
         case .timedOut: "此应用暂时没有响应选区请求，请稍后重试。"
         }
     }
