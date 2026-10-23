@@ -28,6 +28,7 @@ enum DismissMode: String, CaseIterable, Identifiable {
     @Published var trigger: TriggerKey { didSet { save(trigger.rawValue, "trigger") } }
     @Published var target: TargetChoice { didSet { save(target.rawValue, "target") } }
     @Published var dismissMode: DismissMode { didSet { save(dismissMode.rawValue, "dismissMode") } }
+    @Published var allowClipboardFallback: Bool { didSet { save(allowClipboardFallback, "allowClipboardFallback") } }
     @Published var showOriginal: Bool { didSet { save(showOriginal, "showOriginal") } }
     private let defaults: UserDefaults
     init(defaults: UserDefaults = .standard) {
@@ -36,6 +37,7 @@ enum DismissMode: String, CaseIterable, Identifiable {
         trigger = TriggerKey(rawValue: defaults.string(forKey: "trigger") ?? "") ?? .option
         target = TargetChoice(rawValue: defaults.string(forKey: "target") ?? "") ?? .automatic
         dismissMode = DismissMode(rawValue: defaults.string(forKey: "dismissMode") ?? "") ?? .automatic
+        allowClipboardFallback = defaults.bool(forKey: "allowClipboardFallback")
         showOriginal = defaults.object(forKey: "showOriginal") as? Bool ?? true
     }
     private func save(_ value: Any, _ key: String) { defaults.set(value, forKey: key) }

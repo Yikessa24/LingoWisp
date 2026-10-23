@@ -8,7 +8,7 @@ struct TranslationRequest: Identifiable, Equatable {
 }
 
 enum BubbleState: Equatable {
-    case loading, result(String), message(String), needsDownload
+    case loading, result(String), message(String), needsDownload, selectionUnavailable
 }
 
 @MainActor final class TranslationModel: ObservableObject {
@@ -18,6 +18,7 @@ enum BubbleState: Equatable {
     @Published var pair: LanguagePair?
     var onChange: (() -> Void)?
     var onFinished: (() -> Void)?
+    var copySelection: (() -> Void)?
     var openPreparation: ((LanguagePair) -> Void)?
     private var availabilityTask: Task<Void, Never>?
     private var timeoutTask: Task<Void, Never>?
@@ -78,6 +79,7 @@ enum BubbleState: Equatable {
         guard request?.id == id else { return }
         finish(.message("翻译未完成。请在设置中检查语言包，然后重试。"))
     }
+    func unavailable(copy: @escaping () -> Void) { reset(); copySelection = copy; finish(.selectionUnavailable) }
     func message(_ message: String) { reset(); finish(.message(message)) }
     private func finish(_ state: BubbleState) {
         timeoutTask?.cancel(); timeoutTask = nil
@@ -89,7 +91,7 @@ enum BubbleState: Equatable {
         generation = UUID()
         availabilityTask?.cancel(); availabilityTask = nil
         timeoutTask?.cancel(); timeoutTask = nil
-        request = nil; original = ""; pair = nil; state = .loading
+        request = nil; original = ""; pair = nil; state = .loading; copySelection = nil
     }
 }
 

@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import Carbon
 
 struct Selection: Sendable {
     let text: String
@@ -7,12 +8,13 @@ struct Selection: Sendable {
 }
 
 enum SelectionError: Error, LocalizedError {
-    case permission, secure, unavailable, timedOut
+    case permission, secure, unavailable, timedOut, unsafeForCopy
     var errorDescription: String? {
         switch self {
         case .permission: "需要辅助功能权限。请在菜单栏打开设置。"
         case .secure: "出于隐私保护，已跳过安全输入区域。"
-        case .unavailable: "此应用未提供可访问的选区。可尝试先选中，再按 ⌃⌥⌘T。"
+        case .unavailable: "此应用未公开选中文字，可尝试复制兼容模式。"
+        case .unsafeForCopy: "无法确认输入区域的安全状态，未执行复制。"
         case .timedOut: "此应用暂时没有响应选区请求，请稍后重试。"
         }
     }
@@ -21,8 +23,41 @@ enum SelectionError: Error, LocalizedError {
 /// AX calls can block in another process. Keep them off the UI actor and impose
 /// a per-call timeout, a small candidate budget, and an overall time budget.
 actor SelectionReader {
+    func validateForCopy(pid: pid_t, point: CGPoint) throws {
+        guard AXIsProcessTrusted() else { throw SelectionError.permission }
+        guard !IsSecureEventInputEnabled() else { throw SelectionError.secure }
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 0.15)
+        var focused: CFTypeRef?
+        AXUIElementCopyAttributeValue(app, kAXFocusedUIElementAttribute as CFString, &focused)
+        var hit: AXUIElement?
+        AXUIElementCopyElementAtPosition(app, Float(point.x), Float(point.y), &hit)
+        var candidates: [AXUIElement] = []
+        if let focused, CFGetTypeID(focused) == AXUIElementGetTypeID() { candidates.append(focused as! AXUIElement) }
+        if let hit { candidates.append(hit) }
+        guard !candidates.isEmpty else { throw SelectionError.unsafeForCopy }
+        let deadline = Date().addingTimeInterval(0.9)
+        for candidate in candidates {
+            var current: AXUIElement? = candidate
+            for _ in 0..<5 {
+                guard let item = current else { break }
+                guard Date() < deadline else { throw SelectionError.unsafeForCopy }
+                var subrole: CFTypeRef?
+                AXUIElementCopyAttributeValue(item, kAXSubroleAttribute as CFString, &subrole)
+                if subrole as? String == kAXSecureTextFieldSubrole { throw SelectionError.secure }
+                var protected: CFTypeRef?
+                AXUIElementCopyAttributeValue(item, "AXProtectedContent" as CFString, &protected)
+                if protected as? Bool == true { throw SelectionError.secure }
+                var parent: CFTypeRef?
+                AXUIElementCopyAttributeValue(item, kAXParentAttribute as CFString, &parent)
+                current = parent.flatMap { CFGetTypeID($0) == AXUIElementGetTypeID() ? ($0 as! AXUIElement) : nil }
+            }
+        }
+    }
+
     func read(pid: pid_t, point: CGPoint) throws -> Selection {
         guard AXIsProcessTrusted() else { throw SelectionError.permission }
+        guard !IsSecureEventInputEnabled() else { throw SelectionError.secure }
         let app = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(app, 0.2)
         let deadline = Date().addingTimeInterval(1.2)
@@ -57,6 +92,7 @@ actor SelectionReader {
             if secure(hit) { throw SelectionError.secure }
             candidates.append(hit)
         }
+        if let window = element(attribute(app, kAXFocusedWindowAttribute)) { candidates.append(window) }
         // Some browsers expose selected text on a focused element's parent.
         var index = 0
         while index < candidates.count && index < 7 && Date() < deadline {
@@ -88,6 +124,14 @@ actor SelectionReader {
                         }
                     }
                 }
+            }
+            // WebKit/Chromium can expose selected text as an opaque marker range.
+            // Use it only as the parameter to the provider's supported AX query.
+            if text == nil || text?.isEmpty == true,
+               let marker = attribute(candidate, "AXSelectedTextMarkerRange"), Date() < deadline {
+                var selected: CFTypeRef?
+                AXUIElementCopyParameterizedAttributeValue(candidate, "AXStringForTextMarkerRange" as CFString, marker, &selected)
+                text = selected as? String
             }
             if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 return Selection(text: text, axBounds: bounds)

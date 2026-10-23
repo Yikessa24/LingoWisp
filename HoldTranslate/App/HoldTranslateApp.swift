@@ -13,6 +13,8 @@ import ApplicationServices
     private let settingsModel = SettingsModel()
     private let translation = TranslationModel()
     private let reader = SelectionReader()
+    private let clipboardReader = ClipboardSelectionReader()
+    private let instanceLock = InstanceLock()
     private var monitor: InputMonitor!
     private var bubble: BubbleController!
     private var statusItem: NSStatusItem!
@@ -24,10 +26,13 @@ import ApplicationServices
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        let lockURL = FileManager.default.temporaryDirectory.appendingPathComponent("com.yikessa.HoldTranslate.instance.lock")
+        guard instanceLock.acquire(at: lockURL) else { NSApp.terminate(nil); return }
         if CommandLine.arguments.contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
         if CommandLine.arguments.contains("--light") { NSApp.appearance = NSAppearance(named: .aqua) }
         bubble = BubbleController(model: translation, preferences: preferences)
         monitor = InputMonitor(preferences: preferences)
+        monitor.onGestureStatus = { [weak self] in self?.writeInputStatus($0) }
         monitor.onSelection = { [weak self] in self?.translate(at: $0) }
         monitor.onOutsideClick = { [weak self] in self?.dismiss() }
         monitor.onTyping = { [weak self] in self?.dismiss() }
@@ -41,6 +46,7 @@ import ApplicationServices
         translation.onFinished = { [weak self] in
             self?.bubble.finished()
             self?.recordDiagnosticResult()
+            if case .result = self?.translation.state { self?.writeInputStatus("translationSucceeded") }
         }
         translation.openPreparation = { [weak self] pair in
             self?.dismiss(); self?.settingsModel.preparationPair = pair; self?.showSettings()
@@ -87,6 +93,17 @@ import ApplicationServices
             }
         }
     }
+    private func writeInputStatus(_ stage: String) {
+        guard let flag = CommandLine.arguments.firstIndex(of: "--input-report"),
+              CommandLine.arguments.indices.contains(flag + 1) else { return }
+        // Opt-in troubleshooting only: one status record, no text, key contents,
+        // app identifiers or absolute mouse positions.
+        let report: [String: Any] = ["stage": stage, "accessibilityTrusted": AXIsProcessTrusted(),
+                                    "trigger": preferences.trigger.rawValue, "enabled": preferences.enabled]
+        if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
+            try? data.write(to: URL(fileURLWithPath: CommandLine.arguments[flag + 1]), options: .atomic)
+        }
+    }
     private var diagnosticFrontmost: String?
     private var diagnosticFinished = false
     private func recordDiagnosticResult() {
@@ -96,7 +113,7 @@ import ApplicationServices
         case .loading: break
         case .result(let text): writeDiagnostic(status: text.isEmpty ? "emptyResult" : "translated")
         case .needsDownload: writeDiagnostic(status: "needsDownload")
-        case .message: writeDiagnostic(status: "error")
+        case .message, .selectionUnavailable: writeDiagnostic(status: "error")
         }
     }
     private func writeDiagnostic(status: String) {
@@ -151,19 +168,33 @@ import ApplicationServices
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
     }
-    private func translate(at point: CGPoint) {
+    private func translate(at point: CGPoint, usingClipboard: Bool = false, expectedPID: pid_t? = nil) {
         guard preferences.enabled, let front = NSWorkspace.shared.frontmostApplication, front.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+        if let expectedPID, expectedPID != front.processIdentifier { dismiss(); return }
         dismiss()
         let token = UUID(); generation = token
         let pid = front.processIdentifier
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
         let axPoint = CGPoint(x: point.x, y: primaryHeight - point.y)
-        selectionTask = Task {
+        selectionTask = Task { [self] in
             // Let the source application finish updating its AX selection after mouse-up.
             try? await Task.sleep(for: .milliseconds(65))
             guard !Task.isCancelled else { return }
             do {
-                let selection = try await reader.read(pid: pid, point: axPoint)
+                writeInputStatus(usingClipboard ? "copySafetyCheck" : "accessibilityRead")
+                let selection: Selection
+                if usingClipboard {
+                    try await reader.validateForCopy(pid: pid, point: axPoint)
+                    guard valid(token: token, pid: pid) else { return }
+                    selection = try await clipboardReader.read(pid: pid)
+                } else {
+                    do { selection = try await reader.read(pid: pid, point: axPoint) }
+                    catch SelectionError.unavailable where preferences.allowClipboardFallback {
+                        try await reader.validateForCopy(pid: pid, point: axPoint)
+                        guard valid(token: token, pid: pid) else { return }
+                        selection = try await clipboardReader.read(pid: pid)
+                    }
+                }
                 guard valid(token: token, pid: pid) else { return }
                 let text = try LanguagePolicy.cleaned(selection.text)
                 var anchor = CGRect(origin: point, size: CGSize(width: 1, height: 1))
@@ -178,8 +209,11 @@ import ApplicationServices
                 if !preferences.trigger.matches(NSEvent.modifierFlags) { bubble.released() }
             } catch {
                 guard valid(token: token, pid: pid) else { return }
-                if case SelectionError.secure = error { return }
-                translation.message(error.localizedDescription)
+                if case SelectionError.secure = error { writeInputStatus("secureInputSkipped"); return }
+                writeInputStatus("selectionReadFailed")
+                if case SelectionError.unavailable = error, !usingClipboard {
+                    translation.unavailable { [weak self] in self?.translate(at: point, usingClipboard: true, expectedPID: pid) }
+                } else { translation.message(error.localizedDescription) }
                 bubble.show(anchor: CGRect(origin: point, size: CGSize(width: 1, height: 1)))
                 bubble.finished()
                 monitor.watchMovement(true)
@@ -194,7 +228,7 @@ import ApplicationServices
         bubble?.hide(); monitor?.watchMovement(false)
     }
     func applicationWillTerminate(_ notification: Notification) {
-        dismiss(); monitor.stop()
+        dismiss(); monitor?.stop()
         for observer in observers { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
         observers.removeAll()
     }

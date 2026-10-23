@@ -70,7 +70,10 @@ struct SettingsView: View {
                             if model.trusted { model.refresh() } else { model.requestPermission() }
                         }
                     }
-                    Text("仅在你触发翻译时读取当前选区。安全输入框会被跳过；不记录按键，不保存翻译历史，也不使用屏幕录制或自动复制。")
+                    Toggle("选区不可访问时使用复制兼容模式", isOn: $preferences.allowClipboardFallback)
+                    Text("兼容模式会临时执行复制并恢复原剪贴板；若剪贴板同时被其他操作修改，则保留新内容。特殊格式或过大的剪贴板会跳过。默认关闭。")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Text("仅在你触发翻译时读取选区，跳过安全输入框。不记录按键或翻译历史，不使用屏幕录制。")
                         .font(.caption).foregroundStyle(.secondary)
                 } header: { Text("权限与隐私") }
                 Section {
@@ -85,7 +88,7 @@ struct SettingsView: View {
             HStack {
                 Text("macOS 原生 · 无账号 · 无历史记录").font(.caption2).foregroundStyle(.tertiary)
                 Spacer()
-                Text("1.0").font(.caption2).foregroundStyle(.tertiary)
+                Text("1.0.1").font(.caption2).foregroundStyle(.tertiary)
             }.padding(.horizontal, 24).padding(.vertical, 14)
         }
         .frame(width: 510, height: 650)

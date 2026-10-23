@@ -1,6 +1,7 @@
 import AppKit
 
 @MainActor final class InputMonitor {
+    var onGestureStatus: ((String) -> Void)?
     var onSelection: ((CGPoint) -> Void)?
     var onOutsideClick: (() -> Void)?
     var onRelease: (() -> Void)?
@@ -16,7 +17,7 @@ import AppKit
         stop()
         let mask: NSEvent.EventTypeMask = [.leftMouseDown, .leftMouseDragged, .leftMouseUp, .rightMouseDown, .otherMouseDown, .flagsChanged, .keyDown, .scrollWheel]
         global = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
-            MainActor.assumeIsolated { self?.handle(event) }
+            MainActor.assumeIsolated { self?.process(event) }
         }
         local = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             MainActor.assumeIsolated {
@@ -38,22 +39,34 @@ import AppKit
         global = nil; local = nil; movement = nil
         gesture.reset()
     }
-    private func handle(_ event: NSEvent) {
+    func process(_ event: NSEvent) {
         guard preferences.enabled else { gesture.reset(); return }
-        let point = NSEvent.mouseLocation
+        if event.cgEvent?.getIntegerValueField(.eventSourceUserData) == ClipboardSelectionReader.eventMarker { return }
+        let point: CGPoint
+        switch event.type {
+        case .leftMouseDown, .leftMouseDragged, .leftMouseUp, .rightMouseDown, .otherMouseDown:
+            // Global events arrive asynchronously. Sampling mouseLocation here
+            // can use the final cursor position for every event in a quick drag.
+            point = event.window.map { $0.convertPoint(toScreen: event.locationInWindow) } ?? event.locationInWindow
+        default: point = NSEvent.mouseLocation
+        }
         let matches = preferences.trigger.matches(event.modifierFlags)
         switch event.type {
         case .leftMouseDown:
             onOutsideClick?()
             gesture.down(at: point, time: event.timestamp, matches: matches)
+            onGestureStatus?(matches ? "mouseDownMatched" : "mouseDownUnmatched")
         case .leftMouseDragged:
             gesture.drag(to: point, matches: matches)
         case .leftMouseUp:
-            if gesture.up(at: point, time: event.timestamp, matches: matches) { onSelection?(point) }
+            let accepted = gesture.up(at: point, time: event.timestamp, matches: matches)
+            onGestureStatus?(accepted ? "dragAccepted" : "mouseUpRejected")
+            if accepted { onSelection?(point) }
         case .flagsChanged:
             if !matches { gesture.reset(); onRelease?() }
         case .keyDown:
             if event.keyCode == 17 && event.modifierFlags.intersection([.command, .shift, .option, .control]) == [.control, .option, .command] && !event.isARepeat {
+                onGestureStatus?("compatibilityShortcut")
                 onSelection?(point)
             } else { onTyping?() }
         case .rightMouseDown, .otherMouseDown, .scrollWheel: onOutsideClick?()

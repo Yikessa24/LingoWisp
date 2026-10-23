@@ -23,7 +23,11 @@ struct GestureTracker {
 
     mutating func up(at point: CGPoint, time: TimeInterval, matches: Bool) -> Bool {
         defer { reset() }
-        guard let origin, active, dragged, matches else { return false }
+        guard let origin, active, matches else { return false }
+        // Down/up positions are sufficient evidence of a held-button drag when
+        // the global monitor coalesces intermediate drag callbacks.
+        let distance = hypot(point.x - origin.x, point.y - origin.y)
+        guard dragged || distance >= 6 else { return false }
         return time - beganAt >= 0.06 && time - beganAt <= 90
             && hypot(point.x - origin.x, point.y - origin.y) >= 3
     }

@@ -49,6 +49,12 @@ struct BubbleView: View {
                 }
             case .message(let message):
                 Text(message).font(.system(size: 13)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            case .selectionUnavailable:
+                Text("此应用未公开可访问的选中文字。")
+                    .font(.system(size: 13)).foregroundStyle(.secondary)
+                Button("复制选区并翻译") { model.copySelection?() }.buttonStyle(.bordered)
+                Text("仅此次临时复制，随后恢复原剪贴板。也可在设置中启用自动兼容。")
+                    .font(.caption).foregroundStyle(.tertiary)
             case .needsDownload:
                 Text("首次翻译需要下载语言包。下载后可在设备端使用。")
                     .font(.system(size: 13)).foregroundStyle(.secondary)
