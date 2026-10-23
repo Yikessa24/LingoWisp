@@ -2,6 +2,17 @@ import Foundation
 import CoreGraphics
 
 struct BubblePlacement {
+    static func dragRegion(in bounds: CGRect) -> CGRect {
+        // Leave the copy/close buttons and the body out of the drag area.
+        CGRect(x: bounds.minX + 10, y: bounds.maxY - 44, width: max(0, bounds.width - 94), height: 40)
+    }
+
+    static func manualFrame(topLeft: CGPoint, size: CGSize, visibleFrame: CGRect) -> CGRect {
+        let safe = visibleFrame.insetBy(dx: 8, dy: 8)
+        let width = min(size.width, safe.width), height = min(size.height, safe.height)
+        return CGRect(x: min(max(topLeft.x, safe.minX), safe.maxX - width),
+                      y: min(max(topLeft.y - height, safe.minY), safe.maxY - height), width: width, height: height)
+    }
     /// All arguments use AppKit's global, bottom-left coordinate space, in points.
     static func frame(anchor: CGRect, size: CGSize, visibleFrame: CGRect) -> CGRect {
         let safe = visibleFrame.insetBy(dx: 12, dy: 12)

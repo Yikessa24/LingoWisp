@@ -27,6 +27,7 @@ struct BubbleView: View {
                     .help("关闭 · 气泡内双指右滑").accessibilityLabel("关闭翻译")
             }
             .foregroundStyle(.secondary).buttonStyle(.borderless)
+            .help("拖动顶部移动气泡，支持三指拖移")
 
             if preferences.showOriginal && !model.original.isEmpty {
                 Text(model.original).font(.system(size: 12)).foregroundStyle(.secondary)
@@ -90,17 +91,33 @@ struct BubbleView: View {
     }
 }
 
+final class BubbleHostingView<Content: View>: NSHostingView<Content> {
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        let region = BubblePlacement.dragRegion(in: bounds)
+        let cursorRect = isFlipped ? CGRect(x: region.minX, y: bounds.height - region.maxY, width: region.width, height: region.height) : region
+        addCursorRect(cursorRect, cursor: .openHand)
+    }
+}
+
 final class TranslationPanel: NSPanel {
     var onScroll: ((NSEvent) -> Bool)?
+    var canStartDrag: ((NSEvent) -> Bool)?
+    var onDrag: (() -> Void)?
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
     override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown, canStartDrag?(event) == true {
+            onDrag?()
+            performDrag(with: event)
+            return
+        }
         if event.type == .scrollWheel, onScroll?(event) == true { return }
         super.sendEvent(event)
     }
 }
 
-@MainActor final class BubbleController {
+@MainActor final class BubbleController: NSObject, NSWindowDelegate {
     private let panel: TranslationPanel
     private let model: TranslationModel
     private let reduceMotion: () -> Bool
@@ -108,9 +125,12 @@ final class TranslationPanel: NSPanel {
     private var size = CGSize(width: 358, height: 160)
     private var closeGeneration = UUID()
     private var swipe = BubbleSwipeTracker()
+    private var burst: BubbleBurstEffect?
+    private var manualTopLeft: CGPoint?
+    private var positioning = false
     private(set) var isDismissing = false
     var onHide: (() -> Void)?
-    var isVisible: Bool { panel.isVisible }
+    var isVisible: Bool { panel.isVisible || burst?.isVisible == true }
     var frame: CGRect { panel.frame }
     var canBecomeKey: Bool { panel.canBecomeKey }
 
@@ -118,6 +138,9 @@ final class TranslationPanel: NSPanel {
          reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }) {
         self.model = model; self.reduceMotion = reduceMotion
         panel = TranslationPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        super.init()
+        panel.delegate = self
+        panel.isMovable = true
         panel.isFloatingPanel = true
         panel.level = .popUpMenu
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
@@ -126,14 +149,24 @@ final class TranslationPanel: NSPanel {
         panel.isReleasedWhenClosed = false
         panel.animationBehavior = .none
         panel.setAccessibilityLabel("HoldTranslate 翻译")
-        panel.contentView = NSHostingView(rootView: BubbleView(model: model, preferences: preferences,
+        panel.contentView = BubbleHostingView(rootView: BubbleView(model: model, preferences: preferences,
             close: { [weak self] in self?.hide(dissolving: true) },
             sizeChanged: { [weak self] size in self?.resize(size) }))
         panel.contentView?.wantsLayer = true
         panel.onScroll = { [weak self] in self?.handleScroll($0) ?? false }
+        panel.canStartDrag = { [weak self] event in
+            guard let self, !self.isDismissing, let bounds = self.panel.contentView?.bounds else { return false }
+            return BubblePlacement.dragRegion(in: bounds).contains(event.locationInWindow)
+        }
+        panel.onDrag = { [weak self] in
+            guard let self else { return }
+            self.swipe.reset()
+            self.manualTopLeft = CGPoint(x: self.panel.frame.minX, y: self.panel.frame.maxY)
+        }
     }
     func show(anchor: CGRect) {
         closeGeneration = UUID(); isDismissing = false; swipe.reset()
+        burst?.cancel(); burst = nil; manualTopLeft = nil
         panel.ignoresMouseEvents = false
         panel.contentView?.layer?.mask = nil
         panel.contentView?.layer?.removeAllAnimations()
@@ -166,51 +199,49 @@ final class TranslationPanel: NSPanel {
         return false // Vertical gestures continue to the translation's ScrollView.
     }
     func hide(dissolving: Bool = false) {
-        let token = UUID()
         if dissolving && isDismissing { return }
-        closeGeneration = token; swipe.reset()
+        let token = UUID(); closeGeneration = token; swipe.reset()
+        burst?.cancel(); burst = nil
         guard panel.isVisible else { model.reset(); isDismissing = false; return }
         onHide?()
         guard dissolving else {
-            panel.orderOut(nil); panel.contentView?.layer?.mask = nil
-            panel.contentView?.layer?.removeAllAnimations()
+            panel.orderOut(nil); panel.contentView?.layer?.removeAllAnimations()
             isDismissing = false; model.reset()
             return
         }
-        isDismissing = true
-        panel.ignoresMouseEvents = true
-        model.cancelWork() // Keep the displayed text until the animation completes.
-        let duration = reduceMotion() ? 0.12 : 0.28
-        if !reduceMotion(), let layer = panel.contentView?.layer {
-            let mask = CAGradientLayer()
-            mask.frame = layer.bounds
-            mask.startPoint = CGPoint(x: 0, y: 0.5); mask.endPoint = CGPoint(x: 1, y: 0.5)
-            mask.locations = [0, 0.7, 1]
-            let opaque = [CGColor(gray: 1, alpha: 1), CGColor(gray: 1, alpha: 1), CGColor(gray: 1, alpha: 1)]
-            let dissolved = [CGColor(gray: 1, alpha: 0), CGColor(gray: 1, alpha: 0), CGColor(gray: 1, alpha: 1)]
-            mask.colors = dissolved
-            let fade = CABasicAnimation(keyPath: "colors")
-            fade.fromValue = opaque; fade.toValue = dissolved; fade.duration = duration
-            fade.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            layer.mask = mask; mask.add(fade, forKey: "dissolve")
+        isDismissing = true; panel.ignoresMouseEvents = true
+        model.cancelWork()
+        let finish: @MainActor @Sendable () -> Void = { [weak self] in
+            guard let self, self.closeGeneration == token else { return }
+            self.panel.orderOut(nil)
+            self.burst = nil; self.isDismissing = false
+            self.model.reset()
         }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = duration
-            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            if !reduceMotion() { panel.animator().setFrameOrigin(CGPoint(x: panel.frame.minX + 64, y: panel.frame.minY)) }
-            panel.animator().alphaValue = 0
-        } completionHandler: { [weak self] in
-            Task { @MainActor in
-                guard let self, self.closeGeneration == token else { return }
-                self.panel.orderOut(nil)
-                self.panel.contentView?.layer?.mask = nil
-                self.isDismissing = false
-                self.model.reset()
+        if !reduceMotion(), let view = panel.contentView {
+            view.layoutSubtreeIfNeeded()
+            if let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                view.cacheDisplay(in: view.bounds, to: bitmap)
+                if let image = bitmap.cgImage {
+                    let effect = BubbleBurstEffect(image: image, frame: panel.frame, completion: finish)
+                    burst = effect
+                    effect.start()
+                    panel.orderOut(nil)
+                    return
+                }
             }
         }
+        // Reduced motion (or a failed own-view snapshot) remains a short fade.
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.12
+            panel.animator().alphaValue = 0
+        } completionHandler: { Task { @MainActor in finish() } }
     }
     func reposition() {
         if panel.isVisible, !isDismissing { position() }
+    }
+    func windowDidMove(_ notification: Notification) {
+        guard !positioning, !isDismissing, manualTopLeft != nil else { return }
+        manualTopLeft = CGPoint(x: panel.frame.minX, y: panel.frame.maxY)
     }
     private func resize(_ size: CGSize) {
         guard abs(self.size.height - size.height) > 1 else { return }
@@ -218,9 +249,16 @@ final class TranslationPanel: NSPanel {
         if panel.isVisible, !isDismissing { position() }
     }
     private func position() {
-        let screen = NSScreen.screens.first { $0.frame.contains(CGPoint(x: anchor.midX, y: anchor.midY)) } ?? NSScreen.main
+        let reference = manualTopLeft.map { CGPoint(x: $0.x + size.width / 2, y: $0.y - size.height / 2) }
+            ?? CGPoint(x: anchor.midX, y: anchor.midY)
+        let screen = NSScreen.screens.first { $0.frame.contains(reference) } ?? NSScreen.main
         guard let screen else { return }
-        panel.setFrame(BubblePlacement.frame(anchor: anchor, size: size, visibleFrame: screen.visibleFrame), display: true)
+        positioning = true
+        defer { positioning = false }
+        let frame = manualTopLeft.map { BubblePlacement.manualFrame(topLeft: $0, size: size, visibleFrame: screen.visibleFrame) }
+            ?? BubblePlacement.frame(anchor: anchor, size: size, visibleFrame: screen.visibleFrame)
+        panel.setFrame(frame, display: true)
+        if manualTopLeft != nil { manualTopLeft = CGPoint(x: frame.minX, y: frame.maxY) }
         panel.invalidateShadow()
     }
 }
