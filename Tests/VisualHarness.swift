@@ -9,7 +9,8 @@ import SwiftUI
 }
 
 @MainActor final class VisualDelegate: NSObject, NSApplicationDelegate {
-    private let model = TranslationModel()
+    private let model = TranslationModel(speech: CommandLine.arguments.contains("--speech-only")
+                                          ? SpeechController(engine: SpeechProbeEngine()) : nil)
     private var bubble: BubbleController!
     private var defaults: UserDefaults!
     private var started = Date()
@@ -17,6 +18,10 @@ import SwiftUI
     private var captured = false
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        if CommandLine.arguments.contains("--speech-audio-check") {
+            Task { @MainActor in exit(await SpeechVerification.checkAudio() ? 0 : 1) }
+            return
+        }
         NSApp.appearance = NSAppearance(named: CommandLine.arguments.contains("--dark") ? .darkAqua : .aqua)
         defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
@@ -30,7 +35,8 @@ import SwiftUI
         }
         let point = NSScreen.main?.visibleFrame.center ?? .zero
         bubble.show(anchor: CGRect(origin: point, size: CGSize(width: 1, height: 1)))
-        if CommandLine.arguments.contains("--selection-only") {
+        if CommandLine.arguments.contains("--selection-only") || CommandLine.arguments.contains("--speech-only") {
+            model.pair = LanguagePair(source: "en", target: "zh-Hans")
             model.original = "This is a beautiful day to learn something new."
             model.state = .result("这是一个学习新事物的好日子。你可以选择这段译文的一部分，然后复制。")
             Task { @MainActor in

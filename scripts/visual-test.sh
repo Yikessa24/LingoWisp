@@ -6,7 +6,7 @@ mkdir -p "$app/Contents/MacOS" docs/screenshots
 xcrun swiftc -target arm64-apple-macos15.0 -swift-version 5 -parse-as-library \
   LingoWisp/Core/*.swift LingoWisp/App/Preferences.swift \
   LingoWisp/App/TranslationModel.swift LingoWisp/App/BubbleView.swift LingoWisp/App/BubbleBurstEffect.swift \
-  LingoWisp/App/SelectableTranslationText.swift Tests/VisualHarness.swift \
+  LingoWisp/App/SelectableTranslationText.swift LingoWisp/App/SpeechController.swift Tests/VisualHarness.swift Tests/SpeechVerification.swift \
   -o "$app/Contents/MacOS/VisualTests"
 cat > "$app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>

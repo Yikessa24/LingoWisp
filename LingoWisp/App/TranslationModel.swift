@@ -12,6 +12,8 @@ enum BubbleState: Equatable {
 }
 
 @MainActor final class TranslationModel: ObservableObject {
+    let speech: SpeechController
+    @Published private(set) var contentID = UUID()
     @Published var request: TranslationRequest?
     @Published var state: BubbleState = .loading
     @Published var original = ""
@@ -27,7 +29,8 @@ enum BubbleState: Equatable {
     private let availability: @Sendable (LanguagePair) async -> LanguageAvailability.Status
     private let timeout: Duration
 
-    init(timeout: Duration = .seconds(30), availability: @escaping @Sendable (LanguagePair) async -> LanguageAvailability.Status = { pair in await TranslationModel.languageStatus(pair) }) {
+    init(speech: SpeechController? = nil, timeout: Duration = .seconds(30), availability: @escaping @Sendable (LanguagePair) async -> LanguageAvailability.Status = { pair in await TranslationModel.languageStatus(pair) }) {
+        self.speech = speech ?? SpeechController()
         self.timeout = timeout
         self.availability = availability
     }
@@ -88,12 +91,15 @@ enum BubbleState: Equatable {
         onChange?(); onFinished?()
     }
     func cancelWork() {
+        speech.stop()
         generation = UUID()
         availabilityTask?.cancel(); availabilityTask = nil
         timeoutTask?.cancel(); timeoutTask = nil
         request = nil; copySelection = nil
     }
     func reset() {
+        contentID = UUID()
+        speech.reset()
         cancelWork()
         request = nil; original = ""; pair = nil; state = .loading; copySelection = nil
     }

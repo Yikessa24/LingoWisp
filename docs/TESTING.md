@@ -160,3 +160,11 @@ open build/Distribution/LingoWisp.app --args --smoke-test --diagnostic-report "$
 ## 1.4.2 源码命名与路径检查
 - 源码、入口文件、测试目录与 Swift Package 模块统一更名。`swift build --build-tests` 编译通过，验证新路径和测试导入；没有重新执行功能测试。
 - Release universal 构建、签名及 ZIP 完整性检查通过。新安装版本 1.4.2/build 10 内部确认辅助功能已授权，保留既有快捷键。
+
+## 1.5.0 原文与译文朗读专项
+- 按用户要求只测试此次朗读。`swift test --filter SpeechTests`：9 项、0 失败，覆盖各侧文字和语言、各侧独立选区、再次点击停止、切换取消旧朗读、旧完成回调隔离、缺失声音提示、空选区回退整段、新翻译/关闭气泡停止、中文语音映射和 native UTF-16 选区传递。
+- `zsh scripts/speech-test.sh`：使用生产 utterance 构造逻辑与实际 AVSpeechSynthesizer.write 输出固定中英文样本。最终英文 15,572 PCM frames / peak 0.661、中文 27,763 frames / peak 0.430，无超时，证明实际生成了非静音音频；不将它等同于人工听感评价。
+- 实际气泡界面划选英文 `beautiful`、中文「学习」并点击对应喇叭，专项引擎核对实际提交的文本仅为选区、语言分别为 en/zh-Hans；按钮切换到停止状态。整段朗读、原文/译文切换、再次点击停止验证通过。最终实现的自然完成回调也已核对。
+- 选区来自气泡自身 native text view，不读取源应用或用户剪贴板。固定测试引擎只存在于独立测试包；正式应用不写朗读文本或记录。
+- 原文改为可选择文本；长原文在受限高度内滚动，以便选择摘要后部单词。新请求会重建文本选区，避免重复翻译相同文字时残留旧选区。
+- 其他翻译、全局输入、复制、三指拖移、粒子动效及微信测试未重跑。Release universal 构建、签名与 ZIP 完整性通过，1.5.0/build 11 已安装，用户完成系统验证后辅助功能信任已恢复。

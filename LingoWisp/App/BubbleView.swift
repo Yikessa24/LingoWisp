@@ -30,8 +30,7 @@ struct BubbleView: View {
             .help("拖动顶部移动气泡，支持三指拖移")
 
             if preferences.showOriginal && !model.original.isEmpty {
-                Text(model.original).font(.system(size: 12)).foregroundStyle(.secondary)
-                    .lineLimit(3).frame(maxWidth: .infinity, alignment: .leading)
+                SpeechTextRow(text: model.original, part: .original, language: model.pair?.source, speech: model.speech).id(model.contentID)
                 Divider().opacity(0.65)
             }
             switch model.state {
@@ -41,12 +40,7 @@ struct BubbleView: View {
                     Text("正在翻译…").font(.system(size: 13)).foregroundStyle(.secondary)
                 }.padding(.vertical, 4)
             case .result(let result):
-                if resultHeight(result) <= 270 {
-                    resultText(result).fixedSize(horizontal: false, vertical: true)
-                } else {
-                    ScrollView { resultText(result).fixedSize(horizontal: false, vertical: true) }
-                        .frame(height: 270)
-                }
+                SpeechTextRow(text: result, part: .translation, language: model.pair?.target, speech: model.speech).id(model.contentID)
             case .message(let message):
                 Text(message).font(.system(size: 13)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             case .selectionUnavailable:
@@ -62,6 +56,7 @@ struct BubbleView: View {
                     if let pair = model.pair { model.openPreparation?(pair) }
                 }.buttonStyle(.bordered)
             }
+            SpeechMessage(speech: model.speech)
         }
         .padding(18).frame(width: 358)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -75,18 +70,53 @@ struct BubbleView: View {
             if let request = model.request { TranslationWorker(request: request, model: model).id(request.id) }
         }
     }
-    private func resultHeight(_ text: String) -> CGFloat {
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 5
+}
+
+private struct SpeechTextRow: View {
+    let text: String
+    let part: SpeechPart
+    let language: String?
+    @ObservedObject var speech: SpeechController
+    private var original: Bool { part == .original }
+    private var title: String { original ? "原文" : "译文" }
+    private var textHeight: CGFloat {
+        let paragraph = NSMutableParagraphStyle(); paragraph.lineSpacing = original ? 3 : 5
         return ceil((text as NSString).boundingRect(
-            with: CGSize(width: 322, height: CGFloat.greatestFiniteMagnitude),
+            with: CGSize(width: 292, height: CGFloat.greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: [.font: NSFont.systemFont(ofSize: 15), .paragraphStyle: paragraph]
+            attributes: [.font: NSFont.systemFont(ofSize: original ? 12 : 15), .paragraphStyle: paragraph]
         ).height) + 2
     }
-    private func resultText(_ text: String) -> some View {
-        SelectableTranslationText(text: text)
+    private var content: some View {
+        SelectableTranslationText(text: text, fontSize: original ? 12 : 15, secondary: original,
+                                  accessibilityName: title, selectionChanged: { speech.select($0, in: part) })
             .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Button { speech.toggle(part, text: text, language: language) } label: {
+                Image(systemName: speech.playing == part ? "stop.fill" : "speaker.wave.2")
+                    .font(.system(size: 12)).frame(width: 22, height: 22)
+                    .foregroundStyle(speech.playing == part ? Color.accentColor : Color.secondary)
+            }
+            .buttonStyle(.borderless)
+            .help(speech.playing == part ? "停止朗读" : "朗读\(title) · 选中文字时只读选区")
+            .accessibilityLabel(speech.playing == part ? "停止朗读\(title)" : "朗读\(title)")
+            .disabled(language == nil || text.isEmpty)
+            if textHeight > (original ? 62 : 270) {
+                ScrollView { content }.frame(height: original ? 62 : 270)
+            } else { content }
+        }
+    }
+}
+
+private struct SpeechMessage: View {
+    @ObservedObject var speech: SpeechController
+    var body: some View {
+        if let message = speech.error {
+            Text(message).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
@@ -187,6 +217,7 @@ final class TranslationPanel: NSPanel {
         }
     }
     func show(anchor: CGRect) {
+        model.speech.reset()
         closeGeneration = UUID(); isDismissing = false; swipe.reset()
         burst?.cancel(); burst = nil; manualTopLeft = nil
         panel.resetTextInteraction()

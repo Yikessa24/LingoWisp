@@ -3,9 +3,17 @@ import SwiftUI
 
 struct SelectableTranslationText: NSViewRepresentable {
     let text: String
+    var fontSize: CGFloat = 15
+    var secondary = false
+    var accessibilityName = "译文"
+    var selectionChanged: ((String) -> Void)? = nil
 
     func makeNSView(context: Context) -> TranslationTextView { TranslationTextView() }
-    func updateNSView(_ view: TranslationTextView, context: Context) { view.setTranslation(text) }
+    func updateNSView(_ view: TranslationTextView, context: Context) {
+        view.selectionChanged = selectionChanged
+        view.configure(fontSize: fontSize, secondary: secondary, name: accessibilityName)
+        view.setTranslation(text)
+    }
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: TranslationTextView, context: Context) -> CGSize? {
         nsView.measuredSize(width: proposal.width ?? 322)
     }
@@ -13,9 +21,17 @@ struct SelectableTranslationText: NSViewRepresentable {
 
 /// A read-only native text view: selection, copy and Select All are intentional
 /// interactions. It never asks for focus just because a translation appears.
-@MainActor final class TranslationTextView: NSTextView {
+@MainActor final class TranslationTextView: NSTextView, NSTextViewDelegate {
     private let translationStorage: NSTextStorage
     var copyPasteboard: NSPasteboard = .general
+    var selectionChanged: ((String) -> Void)?
+    private var pointSize: CGFloat = 15
+    private var secondary = false
+    var selectedText: String {
+        let range = selectedRange(), value = string as NSString
+        guard range.length > 0, range.location <= value.length, range.length <= value.length - range.location else { return "" }
+        return value.substring(with: range)
+    }
     override var needsPanelToBecomeKey: Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -33,17 +49,24 @@ struct SelectableTranslationText: NSViewRepresentable {
         textContainer?.lineFragmentPadding = 0
         textContainer?.widthTracksTextView = true
         textContainer?.heightTracksTextView = false
+        delegate = self
         focusRingType = .none
         setAccessibilityLabel("译文")
         toolTip = "划选译文后按 ⌘C，或右键复制"
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    func configure(fontSize: CGFloat, secondary: Bool, name: String) {
+        pointSize = fontSize; self.secondary = secondary
+        setAccessibilityLabel(name)
+        toolTip = "划选\(name)后可复制，或点击喇叭只朗读选中的内容"
+    }
+    func textViewDidChangeSelection(_ notification: Notification) { selectionChanged?(selectedText) }
     func setTranslation(_ text: String) {
         guard string != text else { return }
-        let paragraph = NSMutableParagraphStyle(); paragraph.lineSpacing = 5
+        let paragraph = NSMutableParagraphStyle(); paragraph.lineSpacing = secondary ? 3 : 5
         textStorage?.setAttributedString(NSAttributedString(string: text, attributes: [
-            .font: NSFont.systemFont(ofSize: 15), .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph
+            .font: NSFont.systemFont(ofSize: pointSize), .foregroundColor: secondary ? NSColor.secondaryLabelColor : NSColor.labelColor, .paragraphStyle: paragraph
         ]))
         setSelectedRange(NSRange(location: 0, length: 0))
         invalidateIntrinsicContentSize()
